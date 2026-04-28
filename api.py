@@ -1,9 +1,10 @@
 """HTTP API for Xynth AI.
 - POST /chat       → JSON {session_id, message} → {response}
-- POST /whatsapp   → Twilio WhatsApp webhook (form-encoded)
+- POST /whatsapp   → Twilio WhatsApp webhook (form-encoded). Replies asynchronously.
 - GET  /health
 """
 import os
+import threading
 from flask import Flask, request, jsonify, Response
 from langchain_core.messages import HumanMessage
 from twilio.twiml.messaging_response import MessagingResponse
@@ -76,34 +77,61 @@ def chat():
     return jsonify({"response": _run_agent(session_id, message)})
 
 
+def _send_whatsapp(to_number: str, text: str):
+    """Send a WhatsApp message via Twilio's REST API (used for async replies)."""
+    if not (_twilio and TWILIO_FROM):
+        print("⚠️  Twilio not configured; cannot send async reply.")
+        return
+    for chunk in _chunk_for_whatsapp(text):
+        try:
+            _twilio.messages.create(from_=TWILIO_FROM, to=to_number, body=chunk)
+        except Exception as e:
+            print(f"Failed to send WhatsApp chunk to {to_number}: {e}")
+
+
+def _process_whatsapp_async(from_number: str, body: str):
+    """Run the agent in a background thread and push the reply via Twilio REST."""
+    session_id = f"wa-{from_number}"
+    try:
+        reply = _run_agent(session_id, body)
+    except Exception as e:
+        reply = f"❌ Error: {e}"
+    _send_whatsapp(from_number, reply)
+    print(f"✅ Async reply sent to {from_number}")
+
+
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_webhook():
-    """Twilio WhatsApp webhook. Twilio sends form-encoded data."""
+    """Twilio WhatsApp webhook. Twilio sends form-encoded data.
+
+    To avoid Twilio's 15s webhook timeout, we acknowledge immediately and
+    process the agent in a background thread. The real reply is sent via
+    Twilio's REST API when the agent finishes.
+    """
     from_number = request.form.get("From", "")          # e.g. "whatsapp:+1234567890"
     body = (request.form.get("Body") or "").strip()
     print(f"💬 WhatsApp from {from_number}: {body[:80]}")
 
-    if not body:
-        resp = MessagingResponse()
-        resp.message("(empty message)")
-        return Response(str(resp), mimetype="application/xml")
-
-    session_id = f"wa-{from_number}"
-    reply = _run_agent(session_id, body)
-    chunks = _chunk_for_whatsapp(reply)
-
-    # If we have Twilio creds, send extra chunks via REST (TwiML can carry only so much).
-    # The first chunk goes back as the immediate webhook reply.
     twiml = MessagingResponse()
-    if chunks:
-        twiml.message(chunks[0])
-    if len(chunks) > 1 and _twilio and TWILIO_FROM:
-        for extra in chunks[1:]:
-            try:
-                _twilio.messages.create(from_=TWILIO_FROM, to=from_number, body=extra)
-            except Exception as e:
-                print(f"Failed to send follow-up chunk: {e}")
 
+    if not body:
+        twiml.message("(empty message)")
+        return Response(str(twiml), mimetype="application/xml")
+
+    if not (_twilio and TWILIO_FROM):
+        # Fallback: synchronous reply if Twilio REST isn't configured.
+        reply = _run_agent(f"wa-{from_number}", body)
+        twiml.message(_chunk_for_whatsapp(reply)[0] if reply else "(no response)")
+        return Response(str(twiml), mimetype="application/xml")
+
+    # Kick off background processing and immediately return a typing indicator.
+    threading.Thread(
+        target=_process_whatsapp_async,
+        args=(from_number, body),
+        daemon=True,
+    ).start()
+
+    twiml.message("🤖 Thinking…")
     return Response(str(twiml), mimetype="application/xml")
 
 
