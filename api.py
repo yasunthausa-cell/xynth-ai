@@ -18,8 +18,13 @@ _seen_sessions = set()
 
 TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
-TWILIO_FROM = os.environ.get("TWILIO_WHATSAPP_NUMBER")  # e.g. "whatsapp:+14155238886"
+_raw_from = (os.environ.get("TWILIO_WHATSAPP_NUMBER") or "").strip()
+# Accept either "+14155238886" or "whatsapp:+14155238886" — auto-prefix.
+if _raw_from and not _raw_from.startswith("whatsapp:"):
+    _raw_from = "whatsapp:" + _raw_from
+TWILIO_FROM = _raw_from
 _twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN) if (TWILIO_SID and TWILIO_TOKEN) else None
+print(f"Twilio configured: client={bool(_twilio)}, from={TWILIO_FROM!r}")
 
 
 def _run_agent(session_id: str, message: str) -> str:
