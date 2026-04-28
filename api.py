@@ -6,6 +6,8 @@
 import os
 import datetime
 import threading
+import traceback
+import concurrent.futures
 from flask import Flask, request, jsonify, Response, send_from_directory
 from langchain_core.messages import HumanMessage
 from twilio.twiml.messaging_response import MessagingResponse
@@ -24,26 +26,46 @@ _seen_sessions = set()
 print(f"Twilio configured: {_msg.configured()}, from={_msg.TWILIO_FROM!r}")
 
 
+import re as _re
+import time as _time
+
+
+def _parse_retry_after(err: str) -> float:
+    """Pull the 'try again in 4.005s' hint from a Groq 429 error."""
+    m = _re.search(r"try again in ([\d.]+)\s*s", err, flags=_re.IGNORECASE)
+    return min(float(m.group(1)) + 0.5, 20.0) if m else 5.0
+
+
 def _run_agent(session_id: str, message: str) -> str:
     is_first = session_id not in _seen_sessions
     _seen_sessions.add(session_id)
     messages = [system_prompt, HumanMessage(content=message)] if is_first else [HumanMessage(content=message)]
     config = {"configurable": {"thread_id": session_id}, "recursion_limit": 15}
 
-    try:
+    def _invoke(msgs):
         final = None
-        for chunk in agent.stream({"messages": messages}, config=config, stream_mode="values"):
+        for chunk in agent.stream({"messages": msgs}, config=config, stream_mode="values"):
             final = chunk
         return final["messages"][-1].content if final else "(no response)"
+
+    try:
+        return _invoke(messages)
     except Exception as e:
         err = str(e)
+        # Rate-limit: wait the suggested time and retry once.
+        if "rate_limit" in err.lower() or "429" in err:
+            wait = _parse_retry_after(err)
+            print(f"⏳ Rate-limited; waiting {wait:.1f}s before retry…")
+            _time.sleep(wait)
+            try:
+                return _invoke([HumanMessage(content=message)])
+            except Exception as e2:
+                return f"⚠️ I'm being rate-limited by the AI provider right now. Please try again in a minute. ({e2})"
+        # Recursion / tool loop: retry with stricter instructions.
         if "tool_use_failed" in err or "GraphRecursionError" in err:
             try:
                 retry = [HumanMessage(content=message + "\n\n(Use the minimum number of tool calls. Pick ONE tool per need. Stop and answer once you have enough info.)")]
-                final = None
-                for chunk in agent.stream({"messages": retry}, config=config, stream_mode="values"):
-                    final = chunk
-                return final["messages"][-1].content if final else f"Error: {err}"
+                return _invoke(retry)
             except Exception as e2:
                 return f"❌ Error: {str(e2)}"
         return f"❌ Error: {err}"
@@ -88,16 +110,36 @@ def _augment_with_context(from_number: str, body: str) -> str:
             f"User: {body}")
 
 
+_AGENT_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "90"))
+
+
 def _process_whatsapp_async(from_number: str, body: str):
-    """Run the agent in a background thread and push the reply via Twilio REST."""
+    """Run the agent in a background thread and push the reply via Twilio REST.
+    Hard timeout so a hanging tool can never silently swallow the reply.
+    """
     session_id = f"wa-{from_number}"
     augmented = _augment_with_context(from_number, body)
+    reply = None
     try:
-        reply = _run_agent(session_id, augmented)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(_run_agent, session_id, augmented)
+            try:
+                reply = fut.result(timeout=_AGENT_TIMEOUT_SECONDS)
+            except concurrent.futures.TimeoutError:
+                reply = (f"⏱️ Sorry, that took longer than {_AGENT_TIMEOUT_SECONDS}s and I had to stop. "
+                         f"Try a simpler request, or break it into smaller steps.")
+                print(f"⚠️  Agent timeout for {from_number} on message: {body[:80]!r}")
     except Exception as e:
-        reply = f"❌ Error: {e}"
-    _send_whatsapp(from_number, reply)
-    print(f"✅ Async reply sent to {from_number}")
+        traceback.print_exc()
+        reply = f"❌ Internal error: {e}"
+
+    if not reply:
+        reply = "(no response)"
+    try:
+        _send_whatsapp(from_number, reply)
+        print(f"✅ Async reply sent to {from_number} ({len(reply)} chars)")
+    except Exception:
+        traceback.print_exc()
 
 
 # Initialise the scheduler now that _run_agent and _send_whatsapp exist.

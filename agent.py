@@ -10,7 +10,10 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import SystemMessage
-from langchain_community.tools import DuckDuckGoSearchRun
+try:
+    from ddgs import DDGS  # newer package (preferred)
+except ImportError:  # pragma: no cover
+    from duckduckgo_search import DDGS  # type: ignore
 
 import scheduler as _sched
 import messaging as _msg
@@ -47,19 +50,55 @@ def close_browser():
 
 
 @tool
+def web_search(query: str, max_results: int = 5) -> str:
+    """Search the web for current information, news, prices, products, or to find URLs. Returns a numbered list of titles, URLs, and short snippets. Use ONCE per question, then scrape_website on the most promising URL.
+
+    Args:
+        query: What to search for.
+        max_results: How many results to return (default 5, max 10).
+    """
+    import time as _time
+    max_results = max(1, min(int(max_results or 5), 8))
+    last_err = None
+    for attempt in range(3):
+        try:
+            with DDGS(timeout=10) as ddgs:
+                results = list(ddgs.text(query, max_results=max_results))
+            if results:
+                lines = []
+                for i, r in enumerate(results, 1):
+                    title = (r.get("title") or "")[:120]
+                    href = r.get("href") or r.get("url") or ""
+                    body = (r.get("body") or "")[:160]
+                    lines.append(f"{i}. {title}\n   {href}\n   {body}")
+                return "\n\n".join(lines)
+            last_err = "no results"
+        except Exception as e:
+            last_err = str(e)
+        _time.sleep(1.2 * (attempt + 1))
+    return f"Search failed after retries: {last_err}"
+
+
+_DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+@tool
 def scrape_website(url: str) -> str:
-    """Quickly fetch and extract text from a static website URL using HTTP requests. Best for simple pages and articles. For dynamic sites or login flows, use browser_open."""
+    """Quickly fetch and extract readable text from a static website URL. Best for articles, docs, pricing pages. For dynamic sites or login flows use browser_open."""
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=_DEFAULT_HEADERS, timeout=12, allow_redirects=True)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        for script in soup(["script", "style"]):
-            script.extract()
+        for tag in soup(["script", "style", "noscript", "svg", "iframe"]):
+            tag.extract()
         text = ' '.join(soup.stripped_strings)
-        return text[:6000]
+        return text[:3000] if text else "(page returned no extractable text)"
+    except requests.exceptions.Timeout:
+        return f"Failed to scrape {url}: request timed out after 12s. Try browser_open instead."
     except Exception as e:
         return f"Failed to scrape {url}: {str(e)}"
 
@@ -319,29 +358,23 @@ def cancel_scheduled_task(job_id: str) -> str:
     return _sched.cancel_task(job_id)
 
 
-SYSTEM_PROMPT = SystemMessage(content="""You are Xynth AI, a powerful superagent created by Aether Aiko (creator: Yasuntha Ravihara). You can search the web, scrape pages, run Python, save files, call APIs, send emails, and control a real headless browser.
+SYSTEM_PROMPT = SystemMessage(content="""You are Xynth AI by Aether Aiko (creator: Yasuntha Ravihara). Tools: web_search, scrape_website, browser_open/click/type/get_html, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
 
-CRITICAL EFFICIENCY RULES — follow them strictly to avoid wasting tool calls:
-1. Plan first. Decide the minimum number of tool calls needed before you start.
-2. Pick ONE tool per information need. Do NOT call web_search, scrape_website, AND browser_open for the same query.
-   - Use web_search ONCE to find URLs.
-   - Then use scrape_website ONCE on the most promising result. Only use browser_open if scrape_website fails or the site needs JavaScript.
-3. Never repeat the same search query. If a search didn't help, refine the query — don't re-run it.
-4. Stop and answer as soon as you have enough information. Do not "keep gathering" indefinitely.
-5. Hard limit: aim for ≤ 5 tool calls per user request unless the task genuinely requires more (e.g., multi-step browser automation).
-6. If a tool fails twice with the same error, stop trying it and tell the user what went wrong.
+Rules (strict):
+1. Use the FEWEST tool calls possible. Hard cap: 5 per request.
+2. ONE tool per information need. web_search → scrape_website → answer. Don't repeat the same query.
+3. Stop and answer as soon as you have enough info.
+4. If a tool fails twice, stop and tell the user.
 
-Tool selection:
-- Quick facts / current info: web_search → scrape_website (one of each).
-- Dynamic sites, logins, forms: browser_open → browser_get_html → browser_type → browser_click.
-- Visual / design / "how does it look" questions about a website: use analyze_webpage_visually (it uses a vision AI on a screenshot).
-- Generate an image / poster / illustration: generate_image returns a URL. To deliver it to the user on WhatsApp, follow up with send_whatsapp_image.
-- Show the user what a website looks like on WhatsApp: screenshot_and_send (one-shot — takes screenshot and sends it).
-- Sending email: send_email.
-- Scheduling future tasks: schedule_recurring_task or schedule_one_time_task. List/cancel with the matching tools.
-- Computation: execute_python_code.
+Tool guide:
+- Facts / news / prices: web_search ONCE then scrape_website ONCE on best URL.
+- Dynamic / login sites: browser_open → browser_get_html → browser_type/click.
+- "Is this site beautiful / how does X look": analyze_webpage_visually.
+- Generate art/posters: generate_image then send_whatsapp_image.
+- "Show me what X looks like" on WhatsApp: screenshot_and_send.
+- Future task: schedule_recurring_task / schedule_one_time_task.
 
-Be concise in answers, but thorough in actions.""")
+Be concise. Reply in the same language the user used.""")
 
 
 def build_agent():
@@ -352,13 +385,8 @@ def build_agent():
     model_name = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
     llm = ChatGroq(model=model_name, temperature=0.1)
 
-    search_tool = DuckDuckGoSearchRun(
-        name="web_search",
-        description="Search the web for current information, news, or to find URLs."
-    )
-
     tools = [
-        search_tool,
+        web_search,
         scrape_website,
         execute_python_code,
         save_text_to_file,
