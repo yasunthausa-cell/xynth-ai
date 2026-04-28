@@ -1,7 +1,7 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from langchain_ollama import ChatOllama
+from langchain_groq import ChatGroq
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -74,17 +74,19 @@ def call_api(url: str, method: str = "GET", payload: dict = None) -> str:
 def main():
     print("="*60)
     print("🤖🚀 Xynth AI - The Superagent")
-    print("Powered by Ollama and LangGraph")
+    print("Powered by Groq and LangGraph")
     print("="*60)
-    print("Note: Ensure Ollama is running and you have pulled a tool-capable model")
-    print("We recommend: `ollama pull qwen2.5` or `ollama pull llama3.1`\n")
 
-    # You can change this to 'qwen2.5', 'llama3.1', or whichever model you have
-    model_name = "qwen2.5" 
+    if not os.environ.get("GROQ_API_KEY"):
+        print("❌ GROQ_API_KEY is not set. Please add it to your Secrets.")
+        return
+
+    # Tool-capable Groq-hosted model
+    model_name = "llama-3.3-70b-versatile"
     try:
-        llm = ChatOllama(model=model_name, temperature=0.1)
+        llm = ChatGroq(model=model_name, temperature=0.1)
     except Exception as e:
-        print(f"Failed to connect to Ollama: {e}")
+        print(f"Failed to initialize Groq client: {e}")
         return
 
     # Initialize tools
