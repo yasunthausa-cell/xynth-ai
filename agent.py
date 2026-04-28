@@ -13,6 +13,7 @@ from langchain_core.messages import SystemMessage
 from langchain_community.tools import DuckDuckGoSearchRun
 
 import scheduler as _sched
+import messaging as _msg
 
 
 _browser_state = {"playwright": None, "browser": None, "page": None}
@@ -217,6 +218,65 @@ def analyze_webpage_visually(url: str, question: str, full_page: bool = False) -
 
 
 @tool
+def generate_image(prompt: str, width: int = 1024, height: int = 1024) -> str:
+    """Generate an AI image from a text prompt. Returns a public HTTPS URL of the generated PNG. Use this for posters, art, illustrations, mockups, memes, etc. The URL can then be passed to send_whatsapp_image to deliver it.
+
+    Args:
+        prompt: Detailed text description of the image to create.
+        width: Image width in pixels. Default 1024.
+        height: Image height in pixels. Default 1024.
+    """
+    import urllib.parse
+    safe = urllib.parse.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{safe}?width={width}&height={height}&nologo=true"
+    return url
+
+
+@tool
+def send_whatsapp_image(recipient: str, image_url: str, caption: str = "") -> str:
+    """Send an image to a WhatsApp recipient via Twilio. The image_url must be a publicly accessible HTTPS URL (jpg/png/gif/webp). Use this to deliver images you generated, screenshots you took, or images you found online.
+
+    Args:
+        recipient: WhatsApp number with 'whatsapp:' prefix (e.g. 'whatsapp:+14155551234'). Use the current user's number unless told otherwise.
+        image_url: Public HTTPS URL of the image.
+        caption: Optional caption text to accompany the image.
+    """
+    ok = _msg.send_image(recipient, image_url, caption)
+    return "✅ Image sent." if ok else "❌ Failed to send image (check Twilio config and that the URL is public HTTPS)."
+
+
+@tool
+def screenshot_and_send(recipient: str, url: str, caption: str = "", full_page: bool = False) -> str:
+    """Take a screenshot of a webpage and send it to the user on WhatsApp. Use when the user asks "show me what X looks like" or wants a visual of a website.
+
+    Args:
+        recipient: WhatsApp number with 'whatsapp:' prefix.
+        url: The webpage to screenshot.
+        caption: Optional caption text.
+        full_page: If True capture the full scrollable page. Default False (viewport only).
+    """
+    import os, time, uuid
+    try:
+        page = _ensure_browser()
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(2000)
+        static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
+        os.makedirs(static_dir, exist_ok=True)
+        filename = f"shot_{int(time.time())}_{uuid.uuid4().hex[:6]}.png"
+        path = os.path.join(static_dir, filename)
+        page.screenshot(path=path, full_page=full_page)
+
+        host = os.environ.get("REPLIT_DEV_DOMAIN")
+        if not host:
+            return f"Screenshot saved to {path}, but REPLIT_DEV_DOMAIN is not set so I cannot send it."
+        public_url = f"https://{host}/media/{filename}"
+        ok = _msg.send_image(recipient, public_url, caption)
+        return f"✅ Screenshot of {url} sent." if ok else f"❌ Failed to send screenshot. Public URL was {public_url}."
+    except Exception as e:
+        return f"Failed to screenshot {url}: {str(e)}"
+
+
+@tool
 def schedule_recurring_task(prompt: str, recipient: str, hour: int,
                             minute: int = 0, day_of_week: str = "*",
                             timezone: str = "UTC") -> str:
@@ -275,6 +335,8 @@ Tool selection:
 - Quick facts / current info: web_search → scrape_website (one of each).
 - Dynamic sites, logins, forms: browser_open → browser_get_html → browser_type → browser_click.
 - Visual / design / "how does it look" questions about a website: use analyze_webpage_visually (it uses a vision AI on a screenshot).
+- Generate an image / poster / illustration: generate_image returns a URL. To deliver it to the user on WhatsApp, follow up with send_whatsapp_image.
+- Show the user what a website looks like on WhatsApp: screenshot_and_send (one-shot — takes screenshot and sends it).
 - Sending email: send_email.
 - Scheduling future tasks: schedule_recurring_task or schedule_one_time_task. List/cancel with the matching tools.
 - Computation: execute_python_code.
@@ -307,6 +369,9 @@ def build_agent():
         browser_type,
         browser_get_html,
         analyze_webpage_visually,
+        generate_image,
+        send_whatsapp_image,
+        screenshot_and_send,
         schedule_recurring_task,
         schedule_one_time_task,
         list_scheduled_tasks,

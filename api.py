@@ -6,27 +6,22 @@
 import os
 import datetime
 import threading
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, send_from_directory
 from langchain_core.messages import HumanMessage
 from twilio.twiml.messaging_response import MessagingResponse
-from twilio.rest import Client as TwilioClient
 
 from agent import build_agent
 import scheduler as _sched
+import messaging as _msg
+
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
+os.makedirs(STATIC_DIR, exist_ok=True)
 
 app = Flask(__name__)
 agent, system_prompt = build_agent()
 _seen_sessions = set()
 
-TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID")
-TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
-_raw_from = (os.environ.get("TWILIO_WHATSAPP_NUMBER") or "").strip()
-# Accept either "+14155238886" or "whatsapp:+14155238886" — auto-prefix.
-if _raw_from and not _raw_from.startswith("whatsapp:"):
-    _raw_from = "whatsapp:" + _raw_from
-TWILIO_FROM = _raw_from
-_twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN) if (TWILIO_SID and TWILIO_TOKEN) else None
-print(f"Twilio configured: client={bool(_twilio)}, from={TWILIO_FROM!r}")
+print(f"Twilio configured: {_msg.configured()}, from={_msg.TWILIO_FROM!r}")
 
 
 def _run_agent(session_id: str, message: str) -> str:
@@ -55,23 +50,18 @@ def _run_agent(session_id: str, message: str) -> str:
 
 
 def _chunk_for_whatsapp(text: str, limit: int = 1500):
-    """WhatsApp messages have a hard limit around 1600 chars. Split safely."""
-    text = text or ""
-    chunks = []
-    while len(text) > limit:
-        cut = text.rfind("\n", 0, limit)
-        if cut < 200:
-            cut = limit
-        chunks.append(text[:cut])
-        text = text[cut:].lstrip()
-    if text:
-        chunks.append(text)
-    return chunks
+    return _msg.chunk_text(text, limit)
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "twilio_configured": bool(_twilio and TWILIO_FROM)})
+    return jsonify({"status": "ok", "twilio_configured": _msg.configured()})
+
+
+@app.route("/media/<path:filename>", methods=["GET"])
+def serve_media(filename):
+    """Serve generated media files (screenshots, etc.) so Twilio can fetch them."""
+    return send_from_directory(STATIC_DIR, filename)
 
 
 @app.route("/chat", methods=["POST"])
@@ -85,15 +75,7 @@ def chat():
 
 
 def _send_whatsapp(to_number: str, text: str):
-    """Send a WhatsApp message via Twilio's REST API (used for async replies)."""
-    if not (_twilio and TWILIO_FROM):
-        print("⚠️  Twilio not configured; cannot send async reply.")
-        return
-    for chunk in _chunk_for_whatsapp(text):
-        try:
-            _twilio.messages.create(from_=TWILIO_FROM, to=to_number, body=chunk)
-        except Exception as e:
-            print(f"Failed to send WhatsApp chunk to {to_number}: {e}")
+    _msg.send_text(to_number, text)
 
 
 def _augment_with_context(from_number: str, body: str) -> str:
@@ -140,7 +122,7 @@ def whatsapp_webhook():
         twiml.message("(empty message)")
         return Response(str(twiml), mimetype="application/xml")
 
-    if not (_twilio and TWILIO_FROM):
+    if not _msg.configured():
         # Fallback: synchronous reply if Twilio REST isn't configured.
         reply = _run_agent(f"wa-{from_number}", body)
         twiml.message(_chunk_for_whatsapp(reply)[0] if reply else "(no response)")
