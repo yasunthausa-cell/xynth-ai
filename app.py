@@ -14,7 +14,7 @@ def main():
         return
 
     print(f"\n💡 Active model: {runner.current_model}  (will fall back if needed)\n")
-    print("Type 'exit' to quit. Type 'reset' to clear conversation memory.\n")
+    print("Commands: 'exit' quit · 'reset' clear memory · 'models' list models · 'use <n>' switch model\n")
 
     while True:
         try:
@@ -28,6 +28,31 @@ def main():
             if low == "reset":
                 runner.seen_sessions.clear()
                 print("🧹 Memory cleared.\n")
+                continue
+            if low == "models":
+                print("\n🧠 Available models:")
+                for i, (name, _) in enumerate(runner.agents, 1):
+                    marker = "👉" if i - 1 == runner.current_idx else "  "
+                    print(f"   {marker} {i}. {name}")
+                print("\nType 'use <number>' to switch (e.g. 'use 2').\n")
+                continue
+            if low.startswith("use "):
+                arg = user_query[4:].strip()
+                idx = None
+                if arg.isdigit():
+                    n = int(arg) - 1
+                    if 0 <= n < len(runner.agents):
+                        idx = n
+                else:
+                    for i, (name, _) in enumerate(runner.agents):
+                        if arg.lower() in name.lower():
+                            idx = i
+                            break
+                if idx is None:
+                    print(f"⚠️  No model matching '{arg}'. Type 'models' to see the list.\n")
+                else:
+                    runner.current_idx = idx
+                    print(f"✅ Switched to {runner.current_model}\n")
                 continue
 
             print("🤖 Xynth is thinking…")
