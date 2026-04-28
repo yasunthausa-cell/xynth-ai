@@ -1,0 +1,16 @@
+langchain
+langchain-community
+langchain-ollama
+langgraph
+beautifulsoup4
+requests
+duckduckgo-search
+beautifulsoup4
+duckduckgo-search
+langchain
+langchain-community
+langchain-core
+langchain-ollama
+langgraph
+requests
+ddgs
