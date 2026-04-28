@@ -12,7 +12,7 @@ from flask import Flask, request, jsonify, Response, send_from_directory
 from langchain_core.messages import HumanMessage
 from twilio.twiml.messaging_response import MessagingResponse
 
-from agent import build_agent
+from agent import XynthRunner
 import scheduler as _sched
 import messaging as _msg
 
@@ -20,55 +20,13 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_me
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 app = Flask(__name__)
-agent, system_prompt = build_agent()
-_seen_sessions = set()
-
+print("🚀 Initialising Xynth model chain…")
+runner = XynthRunner()
 print(f"Twilio configured: {_msg.configured()}, from={_msg.TWILIO_FROM!r}")
 
 
-import re as _re
-import time as _time
-
-
-def _parse_retry_after(err: str) -> float:
-    """Pull the 'try again in 4.005s' hint from a Groq 429 error."""
-    m = _re.search(r"try again in ([\d.]+)\s*s", err, flags=_re.IGNORECASE)
-    return min(float(m.group(1)) + 0.5, 20.0) if m else 5.0
-
-
 def _run_agent(session_id: str, message: str) -> str:
-    is_first = session_id not in _seen_sessions
-    _seen_sessions.add(session_id)
-    messages = [system_prompt, HumanMessage(content=message)] if is_first else [HumanMessage(content=message)]
-    config = {"configurable": {"thread_id": session_id}, "recursion_limit": 15}
-
-    def _invoke(msgs):
-        final = None
-        for chunk in agent.stream({"messages": msgs}, config=config, stream_mode="values"):
-            final = chunk
-        return final["messages"][-1].content if final else "(no response)"
-
-    try:
-        return _invoke(messages)
-    except Exception as e:
-        err = str(e)
-        # Rate-limit: wait the suggested time and retry once.
-        if "rate_limit" in err.lower() or "429" in err:
-            wait = _parse_retry_after(err)
-            print(f"⏳ Rate-limited; waiting {wait:.1f}s before retry…")
-            _time.sleep(wait)
-            try:
-                return _invoke([HumanMessage(content=message)])
-            except Exception as e2:
-                return f"⚠️ I'm being rate-limited by the AI provider right now. Please try again in a minute. ({e2})"
-        # Recursion / tool loop: retry with stricter instructions.
-        if "tool_use_failed" in err or "GraphRecursionError" in err:
-            try:
-                retry = [HumanMessage(content=message + "\n\n(Use the minimum number of tool calls. Pick ONE tool per need. Stop and answer once you have enough info.)")]
-                return _invoke(retry)
-            except Exception as e2:
-                return f"❌ Error: {str(e2)}"
-        return f"❌ Error: {err}"
+    return runner.run(session_id, message)
 
 
 def _chunk_for_whatsapp(text: str, limit: int = 1500):

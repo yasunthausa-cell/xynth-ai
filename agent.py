@@ -1,5 +1,7 @@
 """Shared agent setup used by both the CLI (app.py) and the HTTP API (api.py)."""
 import os
+import re
+import time
 import smtplib
 import requests
 from email.mime.text import MIMEText
@@ -9,7 +11,7 @@ from langchain_groq import ChatGroq
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 try:
     from ddgs import DDGS  # newer package (preferred)
 except ImportError:  # pragma: no cover
@@ -387,15 +389,15 @@ Tool guide:
 - Future task: schedule_recurring_task / schedule_one_time_task.""")
 
 
-def build_agent():
-    """Build and return (agent, system_prompt). Caller manages thread_id for memory."""
-    if not os.environ.get("GROQ_API_KEY"):
-        raise RuntimeError("GROQ_API_KEY is not set.")
+DEFAULT_MODEL_CHAIN = [
+    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+]
 
-    model_name = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
-    llm = ChatGroq(model=model_name, temperature=0.1)
 
-    tools = [
+def _all_tools():
+    return [
         web_search,
         scrape_website,
         execute_python_code,
@@ -416,6 +418,118 @@ def build_agent():
         cancel_scheduled_task,
     ]
 
+
+def build_agent(model_name: str | None = None):
+    """Build and return (agent, system_prompt) for a single model. Caller manages thread_id."""
+    if not os.environ.get("GROQ_API_KEY"):
+        raise RuntimeError("GROQ_API_KEY is not set.")
+    model_name = model_name or os.environ.get("GROQ_MODEL", DEFAULT_MODEL_CHAIN[0])
+    llm = ChatGroq(model=model_name, temperature=0.1)
     memory = MemorySaver()
-    agent = create_react_agent(llm, tools, checkpointer=memory)
+    agent = create_react_agent(llm, _all_tools(), checkpointer=memory)
     return agent, SYSTEM_PROMPT
+
+
+def _parse_retry_after(err: str) -> float:
+    m = re.search(r"try again in ([\dhm.]+)s", err, flags=re.IGNORECASE)
+    if not m:
+        return 5.0
+    raw = m.group(1)
+    # Handles plain seconds like "4.005" or compound like "18m22.896".
+    total = 0.0
+    if "m" in raw:
+        mins, _, secs = raw.partition("m")
+        try:
+            total += float(mins) * 60
+        except ValueError:
+            pass
+        try:
+            total += float(secs) if secs else 0
+        except ValueError:
+            pass
+    else:
+        try:
+            total = float(raw)
+        except ValueError:
+            total = 5.0
+    return min(total + 0.5, 25.0)
+
+
+class XynthRunner:
+    """Wraps a chain of agents (one per Groq model). On a daily-token rate-limit,
+    automatically falls back to the next model so the bot keeps working.
+    On a per-minute rate-limit, waits the recommended time and retries.
+    """
+
+    def __init__(self, model_names=None):
+        self.model_names = model_names or DEFAULT_MODEL_CHAIN
+        self.system_prompt = SYSTEM_PROMPT
+        self.agents = []  # list of (model_name, agent)
+        for m in self.model_names:
+            try:
+                a, _ = build_agent(m)
+                self.agents.append((m, a))
+                print(f"  ✓ model ready: {m}")
+            except Exception as e:
+                print(f"  ✗ model failed: {m} ({e})")
+        if not self.agents:
+            raise RuntimeError("No Groq models could be initialised.")
+        self.current_idx = 0
+        self.seen_sessions = set()  # (model_name, session_id) -> seen system prompt?
+
+    @property
+    def current_model(self) -> str:
+        return self.agents[self.current_idx][0]
+
+    @property
+    def current_agent(self):
+        return self.agents[self.current_idx][1]
+
+    def _invoke(self, agent, messages, thread_id):
+        config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 15}
+        final = None
+        for chunk in agent.stream({"messages": messages}, config=config, stream_mode="values"):
+            final = chunk
+        return final["messages"][-1].content if final else "(no response)"
+
+    def run(self, session_id: str, message: str) -> str:
+        max_attempts = len(self.agents) * 2 + 1
+        attempts = 0
+        last_err = None
+        current_message = message
+        while attempts < max_attempts:
+            attempts += 1
+            agent = self.current_agent
+            model = self.current_model
+            key = (model, session_id)
+            is_first = key not in self.seen_sessions
+            self.seen_sessions.add(key)
+            msgs = [self.system_prompt, HumanMessage(content=current_message)] if is_first else [HumanMessage(content=current_message)]
+            try:
+                return self._invoke(agent, msgs, session_id)
+            except Exception as e:
+                err = str(e)
+                last_err = err
+                low = err.lower()
+                # Daily quota on this model — switch to next model entirely.
+                if ("rate_limit" in low or "429" in err) and ("per day" in low or "tpd" in low):
+                    if self.current_idx + 1 < len(self.agents):
+                        old = model
+                        self.current_idx += 1
+                        print(f"📉 {old} hit daily limit. Switching to {self.current_model}.")
+                        continue
+                    return ("⚠️ All my brains are tired today 😅 — every model has hit its daily token limit. "
+                            "Try again later, or upgrade Groq to the Dev Tier for much higher limits.")
+                # Per-minute quota — wait and retry on the same model.
+                if "rate_limit" in low or "429" in err:
+                    wait = _parse_retry_after(err)
+                    print(f"⏳ TPM limit on {model}; waiting {wait:.1f}s…")
+                    time.sleep(wait)
+                    continue
+                # Tool-call loop or recursion — tighten the hint and retry once.
+                if "tool_use_failed" in err or "GraphRecursionError" in err:
+                    current_message = (message + "\n\n(Reminder: use the minimum number of tool calls. "
+                                                 "Pick ONE tool per need. Stop and answer once you have enough info.)")
+                    continue
+                return f"❌ Error: {err}"
+        return f"❌ Could not produce a reply after {attempts} attempts. Last error: {last_err}"
