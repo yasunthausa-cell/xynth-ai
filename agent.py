@@ -12,6 +12,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import SystemMessage
 from langchain_community.tools import DuckDuckGoSearchRun
 
+import scheduler as _sched
+
 
 _browser_state = {"playwright": None, "browser": None, "page": None}
 
@@ -177,6 +179,49 @@ def browser_get_html() -> str:
         return f"Failed to get HTML: {str(e)}"
 
 
+@tool
+def schedule_recurring_task(prompt: str, recipient: str, hour: int,
+                            minute: int = 0, day_of_week: str = "*",
+                            timezone: str = "UTC") -> str:
+    """Schedule a RECURRING task that runs at the same time every day or selected days. The agent will execute `prompt` at the scheduled time and send the answer to `recipient` via WhatsApp.
+
+    Args:
+        prompt: What to do at run time (e.g. "search the web for today's top tech news and summarise the top 3 stories").
+        recipient: WhatsApp number including 'whatsapp:' prefix (e.g. 'whatsapp:+14155551234'). Use the user's own number unless they specify someone else.
+        hour: Hour of day, 0-23, IN THE GIVEN TIMEZONE.
+        minute: Minute, 0-59. Default 0.
+        day_of_week: Cron day-of-week. '*' = every day (default). 'mon-fri' = weekdays. 'sat,sun' = weekends. Single days: 'mon','tue','wed','thu','fri','sat','sun'.
+        timezone: IANA timezone name like 'UTC', 'Asia/Colombo', 'America/New_York', 'Europe/London'. Default 'UTC'. ALWAYS ask the user for their timezone if not obvious from context.
+    """
+    return _sched.schedule_task(prompt, recipient, hour, minute, day_of_week, timezone)
+
+
+@tool
+def schedule_one_time_task(prompt: str, recipient: str, run_at_iso: str,
+                           timezone: str = "UTC") -> str:
+    """Schedule a ONE-TIME task that runs once at a specific date/time, then is removed.
+
+    Args:
+        prompt: What to do.
+        recipient: WhatsApp number with 'whatsapp:' prefix.
+        run_at_iso: ISO 8601 date/time without timezone, e.g. '2026-05-01T08:30'.
+        timezone: IANA timezone of the run_at_iso value. Default 'UTC'.
+    """
+    return _sched.schedule_one_time_task(prompt, recipient, run_at_iso, timezone)
+
+
+@tool
+def list_scheduled_tasks(recipient_filter: str = "") -> str:
+    """List all scheduled tasks. Optionally filter by recipient WhatsApp number (with 'whatsapp:' prefix). Returns each task's job_id, next run time, recipient, and prompt."""
+    return _sched.list_tasks(recipient_filter or None)
+
+
+@tool
+def cancel_scheduled_task(job_id: str) -> str:
+    """Cancel/delete a scheduled task by its job_id (obtained from list_scheduled_tasks or the confirmation when scheduled)."""
+    return _sched.cancel_task(job_id)
+
+
 SYSTEM_PROMPT = SystemMessage(content="""You are Xynth AI, a powerful superagent created by Aether Aiko (creator: Yasuntha Ravihara). You can search the web, scrape pages, run Python, save files, call APIs, send emails, and control a real headless browser.
 
 CRITICAL EFFICIENCY RULES — follow them strictly to avoid wasting tool calls:
@@ -222,6 +267,10 @@ def build_agent():
         browser_click,
         browser_type,
         browser_get_html,
+        schedule_recurring_task,
+        schedule_one_time_task,
+        list_scheduled_tasks,
+        cancel_scheduled_task,
     ]
 
     memory = MemorySaver()

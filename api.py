@@ -4,6 +4,7 @@
 - GET  /health
 """
 import os
+import datetime
 import threading
 from flask import Flask, request, jsonify, Response
 from langchain_core.messages import HumanMessage
@@ -11,6 +12,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from twilio.rest import Client as TwilioClient
 
 from agent import build_agent
+import scheduler as _sched
 
 app = Flask(__name__)
 agent, system_prompt = build_agent()
@@ -94,15 +96,30 @@ def _send_whatsapp(to_number: str, text: str):
             print(f"Failed to send WhatsApp chunk to {to_number}: {e}")
 
 
+def _augment_with_context(from_number: str, body: str) -> str:
+    """Prepend lightweight context so the agent knows who/when it's talking to.
+    Useful for scheduling tasks where the recipient defaults to the current user.
+    """
+    now_utc = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    return (f"[Context — current user WhatsApp: {from_number} | server time: {now_utc}. "
+            f"When scheduling tasks for the user, use this number as the recipient unless they say otherwise.]\n\n"
+            f"User: {body}")
+
+
 def _process_whatsapp_async(from_number: str, body: str):
     """Run the agent in a background thread and push the reply via Twilio REST."""
     session_id = f"wa-{from_number}"
+    augmented = _augment_with_context(from_number, body)
     try:
-        reply = _run_agent(session_id, body)
+        reply = _run_agent(session_id, augmented)
     except Exception as e:
         reply = f"❌ Error: {e}"
     _send_whatsapp(from_number, reply)
     print(f"✅ Async reply sent to {from_number}")
+
+
+# Initialise the scheduler now that _run_agent and _send_whatsapp exist.
+_sched.init_scheduler(run_agent_fn=_run_agent, send_whatsapp_fn=_send_whatsapp)
 
 
 @app.route("/whatsapp", methods=["POST"])
