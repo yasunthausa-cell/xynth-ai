@@ -5,3 +5,6 @@ langgraph
 beautifulsoup4
 requests
 ddgs
+langchain-core
+langgraph-checkpoint
+playwright
