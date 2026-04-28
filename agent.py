@@ -180,6 +180,43 @@ def browser_get_html() -> str:
 
 
 @tool
+def analyze_webpage_visually(url: str, question: str, full_page: bool = False) -> str:
+    """Take a screenshot of a webpage and use a vision AI to answer questions about how it LOOKS — visual design, aesthetics, layout, colors, branding, what's on screen, etc. Use this whenever the user asks about the appearance/design/beauty of a site, or wants to know what's visible on a page.
+
+    Args:
+        url: The URL to visit and screenshot.
+        question: Specific question about the page's visuals (e.g. "Is this site modern and beautiful, or dated? Justify.", "Describe the hero section.", "What products are on screen?").
+        full_page: If True, capture the entire scrollable page. If False (default), just the viewport.
+    """
+    try:
+        import base64
+        from groq import Groq
+
+        page = _ensure_browser()
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(2500)
+        screenshot_bytes = page.screenshot(full_page=full_page)
+        b64 = base64.b64encode(screenshot_bytes).decode()
+
+        client = Groq()
+        resp = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"You are evaluating a webpage screenshot from {url}. Answer this question concretely and with specifics from what you see: {question}"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                ],
+            }],
+            max_completion_tokens=900,
+            temperature=0.2,
+        )
+        return resp.choices[0].message.content or "(no analysis)"
+    except Exception as e:
+        return f"Failed to visually analyze {url}: {str(e)}"
+
+
+@tool
 def schedule_recurring_task(prompt: str, recipient: str, hour: int,
                             minute: int = 0, day_of_week: str = "*",
                             timezone: str = "UTC") -> str:
@@ -237,7 +274,9 @@ CRITICAL EFFICIENCY RULES — follow them strictly to avoid wasting tool calls:
 Tool selection:
 - Quick facts / current info: web_search → scrape_website (one of each).
 - Dynamic sites, logins, forms: browser_open → browser_get_html → browser_type → browser_click.
+- Visual / design / "how does it look" questions about a website: use analyze_webpage_visually (it uses a vision AI on a screenshot).
 - Sending email: send_email.
+- Scheduling future tasks: schedule_recurring_task or schedule_one_time_task. List/cancel with the matching tools.
 - Computation: execute_python_code.
 
 Be concise in answers, but thorough in actions.""")
@@ -267,6 +306,7 @@ def build_agent():
         browser_click,
         browser_type,
         browser_get_html,
+        analyze_webpage_visually,
         schedule_recurring_task,
         schedule_one_time_task,
         list_scheduled_tasks,
