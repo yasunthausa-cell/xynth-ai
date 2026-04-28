@@ -8,3 +8,4 @@ ddgs
 langchain-core
 langgraph-checkpoint
 playwright
+flask
