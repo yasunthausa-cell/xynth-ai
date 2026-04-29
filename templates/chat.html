@@ -157,16 +157,21 @@
   .composer-inner:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.15),var(--shadow);}
   textarea{flex:1;background:transparent;border:0;outline:0;color:var(--text);resize:none;font:inherit;padding:10px 10px;max-height:180px;min-height:24px;line-height:1.5;}
   textarea::placeholder{color:var(--muted-2);}
-  .send{
+  .send,.mic{
     appearance:none;border:0;
-    background:linear-gradient(135deg,var(--accent),var(--accent-2));
     color:#06070b;font-weight:700;border-radius:12px;
-    padding:10px 14px;cursor:pointer;height:40px;display:grid;place-items:center;
-    transition:.15s;
+    padding:0 14px;cursor:pointer;height:40px;width:42px;display:grid;place-items:center;
+    transition:.15s;flex-shrink:0;
   }
+  .send{background:linear-gradient(135deg,var(--accent),var(--accent-2));}
   .send:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,92,255,.4);}
-  .send:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
-  .send svg{width:18px;height:18px;}
+  .mic{background:#1c2230;color:var(--text);border:1px solid var(--line-2);}
+  .mic:hover{background:#252c40;border-color:var(--accent);}
+  .mic.recording{background:linear-gradient(135deg,#f43f5e,#ec4899);color:#fff;border-color:transparent;animation:rec-pulse 1.2s infinite;}
+  @keyframes rec-pulse{50%{box-shadow:0 0 0 8px rgba(244,63,94,0)}0%,100%{box-shadow:0 0 0 0 rgba(244,63,94,.5)}}
+  .mic.transcribing{background:#1c2230;color:var(--accent);}
+  .send:disabled,.mic:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+  .send svg,.mic svg{width:18px;height:18px;}
   .hint{color:var(--muted-2);font-size:11px;text-align:center;margin-top:8px;}
 
   @media(max-width:780px){
@@ -222,11 +227,14 @@
     <div class="composer">
       <div class="composer-inner">
         <textarea id="input" placeholder="Message Xynth…  (Shift+Enter for newline)" rows="1"></textarea>
+        <button class="mic" id="mic" title="Hold or click to talk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+        </button>
         <button class="send" id="send" title="Send">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
       </div>
-      <div class="hint">Press Enter to send · Shift+Enter for newline · Xynth can browse, see images, and run code</div>
+      <div class="hint">Enter to send · Shift+Enter for newline · 🎤 click to talk · Xynth can browse, see images, run code</div>
     </div>
   </main>
 </div>
@@ -460,6 +468,71 @@ inputEl.addEventListener('input', () => {
   inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px';
 });
 sendBtn.addEventListener('click', send);
+
+// === Voice input (mic button) ===
+const micBtn = $('#mic');
+let mediaRecorder = null, audioChunks = [], micStream = null;
+
+async function startRecording(){
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  } catch (e) {
+    alert('Microphone access denied or unavailable: ' + e.message);
+    return;
+  }
+  audioChunks = [];
+  // Pick a mime type the browser supports
+  let mime = '';
+  for (const t of ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4']) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) { mime = t; break; }
+  }
+  mediaRecorder = new MediaRecorder(micStream, mime ? {mimeType: mime} : undefined);
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.onstop = onRecordingStop;
+  mediaRecorder.start();
+  micBtn.classList.add('recording');
+  micBtn.title = 'Click to stop';
+}
+
+function stopRecording(){
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+  mediaRecorder.stop();
+  micStream && micStream.getTracks().forEach(t => t.stop());
+  micBtn.classList.remove('recording');
+  micBtn.classList.add('transcribing');
+  micBtn.disabled = true;
+}
+
+async function onRecordingStop(){
+  const blob = new Blob(audioChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
+  const fd = new FormData();
+  fd.append('audio', blob, 'voice.webm');
+  try {
+    const r = await fetch('/transcribe', {method:'POST', body: fd});
+    const j = await r.json();
+    if (j.text) {
+      const existing = inputEl.value.trim();
+      inputEl.value = existing ? (existing + ' ' + j.text) : j.text;
+      inputEl.dispatchEvent(new Event('input'));
+      inputEl.focus();
+      // Auto-send if we got real content
+      if (j.text.length > 0) send();
+    } else if (j.error) {
+      alert('Transcription error: ' + j.error);
+    }
+  } catch (e) {
+    alert('Transcription failed: ' + e.message);
+  } finally {
+    micBtn.classList.remove('transcribing');
+    micBtn.disabled = false;
+    micBtn.title = 'Click to talk';
+  }
+}
+
+micBtn.addEventListener('click', () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+  else startRecording();
+});
 
 document.querySelectorAll('.suggest div').forEach(el => {
   el.addEventListener('click', () => {

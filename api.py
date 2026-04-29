@@ -120,6 +120,33 @@ def usage_endpoint():
     return jsonify(runner.usage_summary())
 
 
+@app.route("/transcribe", methods=["POST"])
+def transcribe():
+    """Accept an audio file from the browser and return transcribed text.
+    Uses fast Whisper via Groq (free tier, supports English + Sinhala + Tamil + 90+ langs).
+    """
+    import requests as _rq
+    if "audio" not in request.files:
+        return jsonify({"error": "no audio file"}), 400
+    audio = request.files["audio"]
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return jsonify({"error": "transcription unavailable"}), 500
+    try:
+        r = _rq.post(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            files={"file": (audio.filename or "voice.webm", audio.stream, audio.mimetype or "audio/webm")},
+            data={"model": "whisper-large-v3-turbo", "response_format": "json"},
+            timeout=30,
+        )
+        if r.status_code != 200:
+            return jsonify({"error": f"transcription failed: {r.text[:200]}"}), 500
+        return jsonify({"text": (r.json().get("text") or "").strip()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 def _send_whatsapp(to_number: str, text: str):
     _msg.send_text(to_number, text)
 
