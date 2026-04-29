@@ -12,3 +12,4 @@ flask
 twilio
 apscheduler
 pytz
+langchain-openai

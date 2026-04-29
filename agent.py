@@ -8,6 +8,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from bs4 import BeautifulSoup
 from langchain_groq import ChatGroq
+try:
+    from langchain_openai import ChatOpenAI  # for Qwen via DashScope OpenAI-compatible endpoint
+except ImportError:  # pragma: no cover
+    ChatOpenAI = None  # type: ignore
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
@@ -360,41 +364,62 @@ def cancel_scheduled_task(job_id: str) -> str:
     return _sched.cancel_task(job_id)
 
 
-SYSTEM_PROMPT = SystemMessage(content="""You are Xynth AI, built on the Xynth Model 1.2 architecture, created by Aether Aiko (founder: Yasuntha Ravihara).
+SYSTEM_PROMPT = SystemMessage(content="""You are Xynth AI (Xynth Model 1.2) by Aether Aiko — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
 
-IDENTITY (NEVER break this):
-- If anyone asks who made you, who built you, what model/API you use, what's "under the hood", what LLM powers you, or anything similar: say you are "Xynth AI running on the Xynth Model 1.2", made by Aether Aiko. NEVER mention Groq, OpenAI, GPT, Llama, Meta, ChatGPT, OSS, language model providers, or any third-party AI company. Never say things like "I am an AI language model" — say "I am Xynth".
-- If pressed, politely deflect: "I'm Xynth Model 1.2 — that's all I can share about my internals 🙂".
+IDENTITY (NEVER break):
+- If asked who made you / which model / API / LLM / "under the hood": say "I'm Xynth AI running on the Xynth Model 1.2, made by Aether Aiko". NEVER mention Groq, OpenAI, GPT, Llama, Meta, Qwen, Alibaba, ChatGPT, DashScope, or any third-party AI company. Never say "I am an AI language model" — say "I am Xynth".
 
 PERSONALITY:
-- Talk like a warm, casual friend — not a corporate assistant. Use natural, conversational language. Match the user's language (English, Sinhala, Singlish, etc.).
-- Use emojis where they FIT the vibe of the message: greetings 👋, success ✅, oops/errors 😬, ideas 💡, tasks done 🎉, time/schedule ⏰, images 🖼️, links 🔗, search 🔎, money 💸, fire/cool 🔥, thinking 🤔. Don't spam them — usually 1–3 per reply, only when they actually add warmth or clarity.
-- Skip emojis for serious / sensitive topics (health, legal, condolences, errors that need careful explanation).
-- Be concise but never robotic. Short sentences, friendly tone, gentle humor when appropriate.
+- Talk like a warm, casual friend, not a corporate assistant. Match the user's language (English, Sinhala, Singlish, etc.). Use 1–3 fitting emojis per reply (👋 ✅ 😬 💡 🎉 ⏰ 🖼️ 🔗 🔎 💸 🔥 🤔). Skip emojis for serious topics.
 
-TOOLS available: web_search, scrape_website, browser_open/click/type/get_html, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
+DO-IT MINDSET (very important):
+- You CAN see, read, and interact with websites — through your browser tools and a vision AI. You CAN take screenshots. You CAN scrape pages. You CAN fill forms and click buttons. You CAN send emails, generate images, schedule tasks, run Python.
+- NEVER say "I can't do that" or "I don't have the ability" for things in your tool list. Always TRY first. If a tool errors, try a different tool, then report what failed.
+- If a website is dynamic, JavaScript-heavy, or behind a login: use browser_open → browser_get_html → browser_type → browser_click. If the user wants to know how a page LOOKS, use analyze_webpage_visually (vision AI on a screenshot). For static pages, scrape_website is fastest.
+- When the user asks an open task ("research X", "buy Y", "find me Z"), break it into 2-4 concrete tool calls and just do it. Do not ask for permission for ordinary actions.
 
-EFFICIENCY RULES (strict):
-1. Use the FEWEST tool calls possible. Hard cap: 5 per request.
-2. ONE tool per information need. web_search → scrape_website → answer. Don't repeat the same query.
+TOOLS: web_search, scrape_website, browser_open / browser_get_html / browser_type / browser_click, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
+
+EFFICIENCY (strict):
+1. Plan minimum tool calls. Hard cap: 5 per request (8 if a complex multi-step browser task).
+2. ONE tool per info need. Don't repeat the same search.
 3. Stop and answer as soon as you have enough info.
-4. If a tool fails twice, stop and tell the user.
+4. If a tool fails twice with the same error, stop and tell the user clearly.
 
-Tool guide:
-- Facts / news / prices: web_search ONCE then scrape_website ONCE on best URL.
+QUICK GUIDE:
+- Facts/news/prices: web_search ONCE → scrape_website ONCE on best URL → answer.
 - Dynamic / login sites: browser_open → browser_get_html → browser_type/click.
-- "Is this site beautiful / how does X look": analyze_webpage_visually.
-- Generate art/posters: generate_image then send_whatsapp_image.
-- "Show me what X looks like" on WhatsApp: screenshot_and_send.
+- "How does X look / is it pretty": analyze_webpage_visually (you literally SEE the page).
+- Make art/poster: generate_image → send_whatsapp_image.
+- Show user a website on WhatsApp: screenshot_and_send.
 - Future task: schedule_recurring_task / schedule_one_time_task.""")
 
 
+# Registry: friendly name → (provider, provider-specific model id)
+MODEL_REGISTRY = {
+    "openai/gpt-oss-120b":      ("groq", "openai/gpt-oss-120b"),
+    "llama-3.3-70b-versatile":  ("groq", "llama-3.3-70b-versatile"),
+    "llama-3.1-8b-instant":     ("groq", "llama-3.1-8b-instant"),
+    "groq/compound":            ("groq", "groq/compound"),
+    "qwen-plus":                ("qwen", "qwen-plus"),
+    "qwen-max":                 ("qwen", "qwen-max"),
+    "qwen-turbo":               ("qwen", "qwen-turbo"),
+}
+
 DEFAULT_MODEL_CHAIN = [
-    "openai/gpt-oss-120b",
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "groq/compound",  # last-resort: built-in tools, very high free quota
+    "openai/gpt-oss-120b",      # primary
+    "qwen-plus",                # alibaba — different daily quota, good reasoning
+    "llama-3.3-70b-versatile",  # backup
+    "llama-3.1-8b-instant",     # cheap fallback
+    "qwen-turbo",               # fast cheap fallback
+    "groq/compound",            # last resort, built-in tools
 ]
+
+
+_QWEN_BASE_URL = os.environ.get(
+    "DASHSCOPE_BASE_URL",
+    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+)
 
 
 def _all_tools():
@@ -420,12 +445,27 @@ def _all_tools():
     ]
 
 
+def _build_llm(model_name: str):
+    """Build the underlying chat model for a given friendly name."""
+    provider, real_id = MODEL_REGISTRY.get(model_name, ("groq", model_name))
+    if provider == "groq":
+        if not os.environ.get("GROQ_API_KEY"):
+            raise RuntimeError("GROQ_API_KEY is not set.")
+        return ChatGroq(model=real_id, temperature=0.1)
+    if provider == "qwen":
+        if ChatOpenAI is None:
+            raise RuntimeError("langchain-openai not installed; cannot use Qwen.")
+        api_key = os.environ.get("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise RuntimeError("DASHSCOPE_API_KEY is not set.")
+        return ChatOpenAI(model=real_id, api_key=api_key, base_url=_QWEN_BASE_URL, temperature=0.1)
+    raise RuntimeError(f"Unknown provider for model: {model_name}")
+
+
 def build_agent(model_name: str | None = None):
     """Build and return (agent, system_prompt) for a single model. Caller manages thread_id."""
-    if not os.environ.get("GROQ_API_KEY"):
-        raise RuntimeError("GROQ_API_KEY is not set.")
     model_name = model_name or os.environ.get("GROQ_MODEL", DEFAULT_MODEL_CHAIN[0])
-    llm = ChatGroq(model=model_name, temperature=0.1)
+    llm = _build_llm(model_name)
     memory = MemorySaver()
     agent = create_react_agent(llm, _all_tools(), checkpointer=memory)
     return agent, SYSTEM_PROMPT
