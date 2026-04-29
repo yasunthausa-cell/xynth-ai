@@ -239,6 +239,4 @@ def whatsapp_webhook():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT") or os.environ.get("AGENT_API_PORT") or "5000")
-    print(f"Starting Waitress production server on port {port} (IPv4 and IPv6)...", flush=True)
-    from waitress import serve
-    serve(app, listen=f"*:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
