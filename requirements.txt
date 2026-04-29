@@ -13,4 +13,4 @@ twilio
 apscheduler
 pytz
 langchain-openai
-gunicorn
+waitress

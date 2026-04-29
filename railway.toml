@@ -2,6 +2,6 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "gunicorn --bind 0.0.0.0:$PORT api:app"
+startCommand = "python api.py"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
