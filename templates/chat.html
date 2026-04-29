@@ -26,12 +26,13 @@
     color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
     overflow:hidden;
   }
-  /* Scrollbars — visible in webkit AND firefox */
-  *{scrollbar-width:thin;scrollbar-color:#3a4566 transparent;}
-  ::-webkit-scrollbar{width:12px;height:12px}
-  ::-webkit-scrollbar-track{background:transparent}
-  ::-webkit-scrollbar-thumb{background:#3a4566;border-radius:6px;border:3px solid transparent;background-clip:content-box;}
-  ::-webkit-scrollbar-thumb:hover{background:#566180;border:3px solid transparent;background-clip:content-box;}
+  /* Scrollbars — always visible, cross-browser */
+  html{scrollbar-width:auto;scrollbar-color:#6a7898 #161b2c;}
+  .messages,.scroll-area{scrollbar-width:auto;scrollbar-color:#6a7898 #161b2c;}
+  .messages::-webkit-scrollbar,.scroll-area::-webkit-scrollbar{width:14px !important;height:14px !important;}
+  .messages::-webkit-scrollbar-track,.scroll-area::-webkit-scrollbar-track{background:#161b2c !important;}
+  .messages::-webkit-scrollbar-thumb,.scroll-area::-webkit-scrollbar-thumb{background:#4a5778 !important;border-radius:7px !important;border:2px solid #161b2c !important;min-height:40px;}
+  .messages::-webkit-scrollbar-thumb:hover,.scroll-area::-webkit-scrollbar-thumb:hover{background:#7c5cff !important;}
   .app{display:grid;grid-template-columns:280px 1fr;height:100vh;}
 
   /* === SIDEBAR === */
@@ -195,6 +196,7 @@
     <div class="section-title">Models · today's tokens</div>
     <div class="scroll-area" id="modelList" style="flex:1;"></div>
 
+    <button class="btn" id="speakToggle" title="Read replies out loud">🔇 Speak replies: off</button>
     <button class="btn" id="resetMem">🧹 Clear memory</button>
     <div class="footer">by Aether Aiko</div>
   </aside>
@@ -448,6 +450,8 @@ async function send(){
       if(pendingImagePlaceholder){ pendingImagePlaceholder.remove(); pendingImagePlaceholder = null; }
       inputEl.focus();
       loadUsage();
+      // Read the final reply out loud if user enabled it
+      if (firstTextReceived) speak(ui.bubble.innerText);
     }
   };
 
@@ -547,6 +551,48 @@ $('#newChat').addEventListener('click', () => {
   localStorage.setItem('xynth_session', id);
   location.reload();
 });
+
+// === Text-to-speech (read replies aloud) ===
+let speakOn = localStorage.getItem('xynth_speak') === '1';
+const speakBtn = $('#speakToggle');
+function refreshSpeakBtn(){
+  speakBtn.textContent = speakOn ? '🔊 Speak replies: on' : '🔇 Speak replies: off';
+  speakBtn.style.borderColor = speakOn ? 'var(--accent)' : '';
+}
+refreshSpeakBtn();
+speakBtn.addEventListener('click', () => {
+  speakOn = !speakOn;
+  localStorage.setItem('xynth_speak', speakOn ? '1' : '0');
+  refreshSpeakBtn();
+  if (!speakOn) try { window.speechSynthesis.cancel(); } catch {}
+});
+
+function stripForSpeech(md){
+  return (md || '')
+    .replace(/```[\s\S]*?```/g, ' ')          // code fences
+    .replace(/`([^`]+)`/g, '$1')              // inline code
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')     // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links → text
+    .replace(/[#>*_~]+/g, '')                 // markdown punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function speak(text){
+  if (!speakOn || !('speechSynthesis' in window)) return;
+  const clean = stripForSpeech(text);
+  if (!clean) return;
+  try { window.speechSynthesis.cancel(); } catch {}
+  const u = new SpeechSynthesisUtterance(clean);
+  u.rate = 1.05; u.pitch = 1.0; u.volume = 1.0;
+  // Prefer a natural-sounding English voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v => /en-US|en-GB/i.test(v.lang) && /Google|Natural|Samantha|Aria/i.test(v.name))
+                  || voices.find(v => /en/i.test(v.lang));
+  if (preferred) u.voice = preferred;
+  window.speechSynthesis.speak(u);
+}
+// Some browsers load voices asynchronously
+if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = () => {};
 
 $('#resetMem').addEventListener('click', async () => {
   await fetch('/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: sessionId})});

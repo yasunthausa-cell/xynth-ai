@@ -1,0 +1,13 @@
+GitHub Team Plan Pricing (as of April 2026)
+
+✅ Current price: $4 per user per month
+
+This is the standard per-user pricing for GitHub Team plan in 2026, confirmed by multiple reliable sources including CostBench and Get AI Perks pricing guides.
+
+The Team plan includes:
+• Organization and team management
+• Manage access to projects on a team-by-team or individual user basis
+• Unlimited public/private repositories
+• Advanced collaboration features
+
+Note: GitHub also offers Free (unlimited repos) and Enterprise ($21/user/month) plans.
