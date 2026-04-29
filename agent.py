@@ -1,6 +1,8 @@
 """Shared agent setup used by both the CLI (app.py) and the HTTP API (api.py)."""
-
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import re
 import time
 import datetime
@@ -285,18 +287,52 @@ def analyze_webpage_visually(url: str, question: str, full_page: bool = False) -
 
 @tool
 def generate_image(prompt: str, width: int = 1024, height: int = 1024) -> str:
-    """Generate an AI image from a text prompt. Returns a public HTTPS URL of the generated PNG. Use this for posters, art, illustrations, mockups, memes, etc. The URL can then be passed to send_whatsapp_image to deliver it.
-
+    """Generate an AI image from a text prompt. Returns a public HTTPS URL of the generated image.
+    
     Args:
         prompt: Detailed text description of the image to create.
         width: Image width in pixels. Default 1024.
         height: Image height in pixels. Default 1024.
     """
-    import urllib.parse
-
-    safe = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{safe}?width={width}&height={height}&nologo=true"
-    return url
+    import os, time, requests
+    api_key = os.environ.get("DASHSCOPE_API_KEY")
+    if not api_key:
+        return "Error: DASHSCOPE_API_KEY is not set."
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "X-DashScope-Async": "enable",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "wanx-v1",
+        "input": {"prompt": prompt},
+        "parameters": {"size": "1024*1024", "n": 1}
+    }
+    
+    try:
+        r = requests.post("https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis", headers=headers, json=payload, timeout=15)
+        if r.status_code != 200:
+            return f"DashScope API Error: {r.text}"
+            
+        task_id = r.json().get("output", {}).get("task_id")
+        if not task_id:
+            return "DashScope Error: No task ID returned."
+            
+        for _ in range(30):
+            time.sleep(2)
+            status_req = requests.get(f"https://dashscope.aliyuncs.com/api/v1/tasks/{task_id}", headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
+            status_json = status_req.json()
+            status = status_json.get("output", {}).get("task_status")
+            if status == "SUCCEEDED":
+                results = status_json.get("output", {}).get("results", [])
+                if results:
+                    return results[0].get("url")
+            elif status == "FAILED":
+                return f"Image generation failed: {status_json}"
+        return "Error: Image generation timed out."
+    except Exception as e:
+        return f"Image generation error: {str(e)}"
 
 
 @tool

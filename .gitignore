@@ -1,0 +1,32 @@
+# Secrets — never commit these
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Database
+*.db
+*.sqlite3
+
+# Playwright
+.playwright/
+
+# Local media/screenshots
+static_media/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git agents
+.agents/
+.local/
