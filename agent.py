@@ -156,6 +156,98 @@ def save_text_to_file(filename: str, content: str) -> str:
 
 
 @tool
+def read_file(filename: str) -> str:
+    """Read the contents of any local file (source code, config, logs, etc.). Use this to inspect your own code, .env secrets, requirements.txt, or any other file before editing.
+
+    Args:
+        filename: Absolute or relative path to the file.
+    """
+    try:
+        path = os.path.abspath(filename)
+        if not os.path.exists(path):
+            return f"File not found: {path}"
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        lines = content.splitlines()
+        if len(lines) > 300:
+            content = "\n".join(lines[:300]) + f"\n... (truncated, {len(lines)} total lines)"
+        return content
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
+
+
+@tool
+def edit_secret(key: str, value: str) -> str:
+    """Add or update a secret/environment variable in the .env file AND apply it to the current process immediately. Use this when the user provides a new API key, or when you discover a missing credential needed for a task.
+
+    Args:
+        key: The environment variable name (e.g. 'GROQ_API_KEY').
+        value: The value to set.
+    """
+    try:
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        # Read existing lines
+        lines = []
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        # Update or append
+        key_found = False
+        new_lines = []
+        for line in lines:
+            if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+                new_lines.append(f"{key}={value}\n")
+                key_found = True
+            else:
+                new_lines.append(line)
+        if not key_found:
+            new_lines.append(f"{key}={value}\n")
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        # Apply to current process immediately
+        os.environ[key] = value
+        return f"✅ Secret '{key}' saved to .env and applied to current session."
+    except Exception as e:
+        return f"Error editing secret: {str(e)}"
+
+
+@tool
+def install_package(package_name: str, alternatives: list = None) -> str:
+    """Install a missing Python package at runtime using pip. Automatically retries with alternative package names if the first attempt fails. Use this whenever a tool fails with an ImportError or ModuleNotFoundError.
+
+    Args:
+        package_name: The primary pip package name to install (e.g. 'playwright', 'openai').
+        alternatives: Optional list of alternative package names to try if the primary fails (e.g. ['ddgs', 'duckduckgo-search']).
+    """
+    import subprocess, sys
+
+    candidates = [package_name] + (alternatives or [])
+    last_err = ""
+    for pkg in candidates:
+        for attempt in range(3):
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", pkg, "--quiet"],
+                    capture_output=True, text=True, timeout=120
+                )
+                if result.returncode == 0:
+                    # Verify it's actually importable
+                    import importlib
+                    mod_name = pkg.replace("-", "_").split("[")[0]
+                    try:
+                        importlib.import_module(mod_name)
+                    except ImportError:
+                        pass  # Some packages have different import names — still count as success
+                    return f"✅ Successfully installed '{pkg}'. You can now use it."
+                last_err = result.stderr.strip()[-300:] if result.stderr else "unknown error"
+            except subprocess.TimeoutExpired:
+                last_err = f"pip install timed out for '{pkg}' (attempt {attempt+1})"
+            except Exception as e:
+                last_err = str(e)
+    return f"❌ Failed to install '{package_name}' (tried: {candidates}). Last error: {last_err}"
+
+
+@tool
 def call_api(url: str, method: str = "GET", payload: dict = None) -> str:
     """Make an HTTP request to an API and return the response."""
     try:
@@ -460,13 +552,20 @@ DO-IT MINDSET (very important):
 - If a website is dynamic, JavaScript-heavy, or behind a login: use browser_open → browser_get_html → browser_type → browser_click. If the user wants to know how a page LOOKS, use analyze_webpage_visually (vision AI on a screenshot). For static pages, scrape_website is fastest.
 - When the user asks an open task ("research X", "buy Y", "find me Z"), break it into 2-4 concrete tool calls and just do it. Do not ask for permission for ordinary actions.
 
-TOOLS: web_search, scrape_website, browser_open / browser_get_html / browser_type / browser_click, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
+SELF-HEALING & SELF-MODIFICATION (very important):
+- If a tool raises ImportError or ModuleNotFoundError: immediately call install_package with the missing package name (and sensible alternatives). Then retry the original task.
+- If a task requires a credential or API key that is missing: ask the user for it once, then call edit_secret to save it permanently to .env and apply it instantly — no restart needed.
+- You can read your own source files with read_file (e.g. read_file('agent.py')) and update secrets with edit_secret. Use these powers responsibly.
+- Retry strategy for installs: try the exact package name first, then common aliases (e.g. 'pillow' → 'Pillow', 'bs4' → 'beautifulsoup4'). After 3 attempts with different names, report failure clearly.
+- Never give up on a task just because one tool failed. Always try an alternative approach before telling the user it's impossible.
+
+TOOLS: web_search, scrape_website, browser_open / browser_get_html / browser_type / browser_click, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, read_file, edit_secret, install_package, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
 
 EFFICIENCY (strict):
-1. Plan minimum tool calls. Hard cap: 5 per request (8 if a complex multi-step browser task).
+1. Plan minimum tool calls. Hard cap: 5 per request (8 if a complex multi-step browser or self-repair task).
 2. ONE tool per info need. Don't repeat the same search.
 3. Stop and answer as soon as you have enough info.
-4. If a tool fails twice with the same error, stop and tell the user clearly.
+4. If a tool fails twice with the same error AND you've tried install_package, stop and tell the user clearly.
 
 QUICK GUIDE:
 - Facts/news/prices: web_search ONCE → scrape_website ONCE on best URL → answer.
@@ -511,6 +610,9 @@ def _all_tools():
         scrape_website,
         execute_python_code,
         save_text_to_file,
+        read_file,
+        edit_secret,
+        install_package,
         call_api,
         send_email,
         browser_open,
