@@ -8,7 +8,7 @@ import datetime
 import threading
 import traceback
 import concurrent.futures
-from flask import Flask, request, jsonify, Response, send_from_directory
+from flask import Flask, request, jsonify, Response, send_from_directory, render_template
 from langchain_core.messages import HumanMessage
 from twilio.twiml.messaging_response import MessagingResponse
 
@@ -33,9 +33,41 @@ def _chunk_for_whatsapp(text: str, limit: int = 1500):
     return _msg.chunk_text(text, limit)
 
 
+@app.route("/", methods=["GET"])
+def home():
+    """Serve the web chat UI."""
+    return render_template("chat.html")
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "twilio_configured": _msg.configured()})
+
+
+@app.route("/models", methods=["GET", "POST"])
+def models_endpoint():
+    """GET → list of models + active. POST {model:'name'} → switch active."""
+    if request.method == "GET":
+        names = [m for m, _ in runner.agents]
+        return jsonify({"models": names, "active": runner.current_model})
+    data = request.get_json(silent=True) or {}
+    name = (data.get("model") or "").strip()
+    for i, (m, _) in enumerate(runner.agents):
+        if m == name or name.lower() in m.lower():
+            runner.current_idx = i
+            return jsonify({"ok": True, "active": runner.current_model})
+    return jsonify({"ok": False, "error": f"No model matching '{name}'"}), 400
+
+
+@app.route("/reset", methods=["POST"])
+def reset_session():
+    """Wipe a session's memory across all models."""
+    data = request.get_json(silent=True) or {}
+    sid = (data.get("session_id") or "").strip()
+    if not sid:
+        return jsonify({"ok": False, "error": "session_id required"}), 400
+    runner.seen_sessions = {k for k in runner.seen_sessions if k[1] != sid}
+    return jsonify({"ok": True})
 
 
 @app.route("/media/<path:filename>", methods=["GET"])

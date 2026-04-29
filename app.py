@@ -1,5 +1,43 @@
 """Interactive CLI for Xynth AI. For programmatic / WhatsApp access, run api.py instead."""
+import sys
+import threading
+import itertools
+import time
 from agent import XynthRunner, close_browser
+
+
+class Spinner:
+    """Tiny animated braille spinner shown while the agent thinks."""
+
+    FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+    def __init__(self, message: str = "🤖 Xynth is thinking"):
+        self.message = message
+        self._stop = threading.Event()
+        self._thread = None
+
+    def _spin(self):
+        cycle = itertools.cycle(self.FRAMES)
+        start = time.time()
+        while not self._stop.is_set():
+            elapsed = time.time() - start
+            sys.stdout.write(f"\r{next(cycle)} {self.message}… ({elapsed:0.1f}s) ")
+            sys.stdout.flush()
+            time.sleep(0.08)
+        # Clear the line on exit
+        sys.stdout.write("\r" + " " * (len(self.message) + 24) + "\r")
+        sys.stdout.flush()
+
+    def __enter__(self):
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        if self._thread:
+            self._thread.join()
 
 
 def main():
@@ -55,9 +93,9 @@ def main():
                     print(f"✅ Switched to {runner.current_model}\n")
                 continue
 
-            print("🤖 Xynth is thinking…")
-            reply = runner.run("cli-session", user_query)
-            print(f"\n✨ Xynth AI: {reply}\n")
+            with Spinner(f"🤖 Xynth ({runner.current_model}) is thinking"):
+                reply = runner.run("cli-session", user_query)
+            print(f"✨ Xynth AI: {reply}\n")
 
         except KeyboardInterrupt:
             print("\n👋 Xynth AI powering down…")
