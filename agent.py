@@ -386,43 +386,13 @@ def generate_image(prompt: str, width: int = 1024, height: int = 1024) -> str:
         width: Image width in pixels. Default 1024.
         height: Image height in pixels. Default 1024.
     """
-    import os, time, requests
-    api_key = os.environ.get("DASHSCOPE_API_KEY")
-    if not api_key:
-        return "Error: DASHSCOPE_API_KEY is not set."
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "X-DashScope-Async": "enable",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "wanx-v1",
-        "input": {"prompt": prompt},
-        "parameters": {"size": "1024*1024", "n": 1}
-    }
-    
+    import urllib.parse
     try:
-        r = requests.post("https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis", headers=headers, json=payload, timeout=15)
-        if r.status_code != 200:
-            return f"DashScope API Error: {r.text}"
-            
-        task_id = r.json().get("output", {}).get("task_id")
-        if not task_id:
-            return "DashScope Error: No task ID returned."
-            
-        for _ in range(30):
-            time.sleep(2)
-            status_req = requests.get(f"https://dashscope.aliyuncs.com/api/v1/tasks/{task_id}", headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
-            status_json = status_req.json()
-            status = status_json.get("output", {}).get("task_status")
-            if status == "SUCCEEDED":
-                results = status_json.get("output", {}).get("results", [])
-                if results:
-                    return results[0].get("url")
-            elif status == "FAILED":
-                return f"Image generation failed: {status_json}"
-        return "Error: Image generation timed out."
+        # We use pollinations.ai since it's fast, free, requires no API key, and doesn't timeout like DashScope.
+        prompt_encoded = urllib.parse.quote(prompt)
+        # Using a deterministic seed based on prompt length just for fun, or we can just let it be random.
+        url = f"https://image.pollinations.ai/prompt/{prompt_encoded}?width={width}&height={height}&nologo=true"
+        return url
     except Exception as e:
         return f"Image generation error: {str(e)}"
 
@@ -565,7 +535,7 @@ SELF-HEALING (very important):
 - DO NOT edit source code or files if the user asks you to modify the project. Just provide the code in your chat response.
 - Never give up on a task just because one tool failed. Always try an alternative approach.
 
-TOOLS: web_search, scrape_website, browser_open / browser_get_html / browser_type / browser_click, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, read_file, install_package, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
+TOOLS: wikipedia_search, query_local_knowledge, web_search, scrape_website, browser_open / browser_get_html / browser_type / browser_click, analyze_webpage_visually, generate_image, send_whatsapp_image, screenshot_and_send, send_email, execute_python_code, save_text_to_file, read_file, install_package, call_api, schedule_recurring_task, schedule_one_time_task, list_scheduled_tasks, cancel_scheduled_task.
 
 EFFICIENCY (strict):
 1. Plan minimum tool calls. Hard cap: 5 per request (8 if a complex multi-step browser or self-repair task).
@@ -574,7 +544,9 @@ EFFICIENCY (strict):
 4. If a tool fails twice with the same error AND you've tried install_package, stop and tell the user clearly.
 
 QUICK GUIDE:
-- Facts/news/prices: web_search ONCE → scrape_website ONCE on best URL → answer.
+- Facts/history/large knowledge: wikipedia_search.
+- Local project info or internal docs: query_local_knowledge.
+- Recent news/prices: web_search ONCE → scrape_website ONCE on best URL → answer.
 - Dynamic / login sites: browser_open → browser_get_html → browser_type/click.
 - "How does X look / is it pretty": analyze_webpage_visually (you literally SEE the page).
 - Make art/poster: generate_image → send_whatsapp_image.
@@ -585,6 +557,7 @@ QUICK GUIDE:
 
 # Registry: friendly name → (provider, provider-specific model id)
 MODEL_REGISTRY = {
+    "qwen3.5-omni-plus-2026-03-15": ("qwen", "qwen3.5-omni-plus-2026-03-15"),
     "openai/gpt-oss-120b": ("groq", "openai/gpt-oss-120b"),
     "llama-3.3-70b-versatile": ("groq", "llama-3.3-70b-versatile"),
     "llama-3.1-8b-instant": ("groq", "llama-3.1-8b-instant"),
@@ -595,7 +568,8 @@ MODEL_REGISTRY = {
 }
 
 DEFAULT_MODEL_CHAIN = [
-    "openai/gpt-oss-120b",  # primary
+    "qwen3.5-omni-plus-2026-03-15", # new primary omni model
+    "openai/gpt-oss-120b",  # backup
     "qwen-plus",  # alibaba — different daily quota, good reasoning
     "llama-3.3-70b-versatile",  # backup
     "llama-3.1-8b-instant",  # cheap fallback
@@ -610,8 +584,51 @@ _QWEN_BASE_URL = os.environ.get(
 )
 
 
+@tool
+def wikipedia_search(query: str) -> str:
+    """Search Wikipedia for encyclopedic facts and large knowledge (RAG). Use this when you need accurate facts, history, science, or general knowledge."""
+    try:
+        import wikipedia
+        results = wikipedia.search(query, results=3)
+        if not results:
+            return "No Wikipedia results found."
+        
+        output = []
+        for res in results:
+            try:
+                page = wikipedia.page(res, auto_suggest=False)
+                output.append(f"Title: {page.title}\nSummary: {page.summary[:500]}...\nURL: {page.url}")
+            except:
+                pass
+        return "\n\n".join(output) if output else "Could not retrieve Wikipedia pages."
+    except Exception as e:
+        return f"Wikipedia search failed: {str(e)}"
+
+
+@tool
+def query_local_knowledge(query: str) -> str:
+    """Search local files for facts or project knowledge (RAG). Use this to find pricing, internal docs, or facts saved in the current directory."""
+    import glob, os
+    results = []
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    files = glob.glob(os.path.join(base_dir, "*.txt")) + glob.glob(os.path.join(base_dir, "*.md"))
+    for f in files:
+        if "requirements.txt" in f: continue
+        try:
+            with open(f, 'r', encoding='utf-8') as file:
+                content = file.read()
+                if query.lower() in content.lower():
+                    results.append(f"--- From {os.path.basename(f)} ---\n{content[:1500]}")
+        except: pass
+    if not results:
+        return "No local knowledge found for that query."
+    return "\n\n".join(results)
+
+
 def _all_tools():
     return [
+        wikipedia_search,
+        query_local_knowledge,
         web_search,
         scrape_website,
         execute_python_code,
@@ -696,6 +713,7 @@ class XynthRunner:
 
     # Conservative free-tier daily token caps (approximate — Groq/DashScope publish these).
     DAILY_TOKEN_LIMITS = {
+        "qwen3.5-omni-plus-2026-03-15": 1_000_000,
         "openai/gpt-oss-120b":     200_000,
         "qwen-plus":             1_000_000,
         "qwen-max":                100_000,
@@ -820,43 +838,44 @@ class XynthRunner:
         pending_tool_calls = {}  # tool_call_id -> name
         final_text = ""
         try:
-            for update in agent.stream({"messages": msgs}, config=config, stream_mode="updates"):
-                # update is like {"agent": {"messages": [AIMessage]}} or {"tools": {"messages": [ToolMessage]}}
-                for node, payload in update.items():
-                    new_msgs = payload.get("messages", []) if isinstance(payload, dict) else []
-                    for m in new_msgs:
-                        cls = m.__class__.__name__
-                        if cls == "AIMessage":
-                            tool_calls = getattr(m, "tool_calls", None) or []
-                            if tool_calls:
-                                for tc in tool_calls:
-                                    name = tc.get("name", "tool")
-                                    args = tc.get("args", {})
-                                    tcid = tc.get("id", "")
-                                    pending_tool_calls[tcid] = name
-                                    yield {"type": "tool_start", "name": name, "args": args}
-                            else:
-                                # Final answer chunk
-                                content = m.content or ""
-                                if content:
-                                    final_text = content
-                                    yield {"type": "text", "content": content}
-                                in_t, out_t = self._extract_token_usage(m)
-                                if in_t or out_t:
-                                    self._record_usage(model, in_t, out_t)
-                                    yield {"type": "usage", "input": in_t, "output": out_t, "model": model}
-                        elif cls == "ToolMessage":
-                            name = getattr(m, "name", None) or pending_tool_calls.get(getattr(m, "tool_call_id", ""), "tool")
-                            result = (m.content or "")
-                            short = result if len(result) < 240 else result[:237] + "…"
-                            evt = {"type": "tool_end", "name": name, "result": short}
-                            # Inline-image hook: when generate_image returns a URL, surface it.
-                            if name == "generate_image" and result.startswith("http"):
-                                evt["image_url"] = result.strip()
-                                yield evt
-                                yield {"type": "image", "url": result.strip()}
-                            else:
-                                yield evt
+            for update in agent.stream({"messages": msgs}, config=config, stream_mode=["messages", "updates"]):
+                if isinstance(update, tuple) and len(update) == 2:
+                    kind, payload = update
+                    if kind == "messages":
+                        msg_chunk, metadata = payload
+                        if msg_chunk.__class__.__name__ == "AIMessageChunk":
+                            if msg_chunk.content and isinstance(msg_chunk.content, str):
+                                final_text += msg_chunk.content
+                                yield {"type": "text", "content": final_text}
+                    elif kind == "updates":
+                        for node, node_data in payload.items():
+                            new_msgs = node_data.get("messages", []) if isinstance(node_data, dict) else []
+                            for m in new_msgs:
+                                cls = m.__class__.__name__
+                                if cls == "AIMessage":
+                                    tool_calls = getattr(m, "tool_calls", None) or []
+                                    if tool_calls:
+                                        for tc in tool_calls:
+                                            name = tc.get("name", "tool")
+                                            args = tc.get("args", {})
+                                            tcid = tc.get("id", "")
+                                            pending_tool_calls[tcid] = name
+                                            yield {"type": "tool_start", "name": name, "args": args}
+                                    in_t, out_t = self._extract_token_usage(m)
+                                    if in_t or out_t:
+                                        self._record_usage(model, in_t, out_t)
+                                        yield {"type": "usage", "input": in_t, "output": out_t, "model": model}
+                                elif cls == "ToolMessage":
+                                    name = getattr(m, "name", None) or pending_tool_calls.get(getattr(m, "tool_call_id", ""), "tool")
+                                    result = (m.content or "")
+                                    short = result if len(result) < 240 else result[:237] + "…"
+                                    evt = {"type": "tool_end", "name": name, "result": short}
+                                    if name == "generate_image" and result.startswith("http"):
+                                        evt["image_url"] = result.strip()
+                                        yield evt
+                                        yield {"type": "image", "url": result.strip()}
+                                    else:
+                                        yield evt
             yield {"type": "done"}
         except Exception as e:
             err = str(e)

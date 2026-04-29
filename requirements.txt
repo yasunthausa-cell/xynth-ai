@@ -12,3 +12,4 @@ flask
 apscheduler
 pytz
 langchain-openai
+wikipedia

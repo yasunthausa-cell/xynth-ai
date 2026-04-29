@@ -255,6 +255,21 @@ def whatsapp_webhook():
     return "OK", 200
 
 
+@app.route('/proxy/image')
+def proxy_image():
+    url = request.args.get('url')
+    if not url:
+        return "No url provided", 400
+    try:
+        r = requests.get(url, stream=True, timeout=20)
+        return Response(
+            stream_with_context(r.iter_content(chunk_size=4096)),
+            content_type=r.headers.get('Content-Type', 'image/jpeg')
+        )
+    except Exception as e:
+        return str(e), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT") or os.environ.get("AGENT_API_PORT") or "5000")
     app.run(host="0.0.0.0", port=port, debug=False)

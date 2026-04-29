@@ -35,18 +35,7 @@
         margin: 0;
       }
       body {
-        background:
-          radial-gradient(
-            1200px 600px at 80% -10%,
-            rgba(124, 92, 255, 0.15),
-            transparent 60%
-          ),
-          radial-gradient(
-            900px 500px at -10% 110%,
-            rgba(34, 211, 238, 0.12),
-            transparent 60%
-          ),
-          var(--bg);
+        background: var(--bg-2);
         color: var(--text);
         font:
           15px/1.6 -apple-system,
@@ -88,9 +77,10 @@
         background: #7c5cff !important;
       }
       .app {
-        display: grid;
-        grid-template-columns: 280px 1fr;
+        display: flex;
+        flex-direction: column;
         height: 100vh;
+        margin: 0 auto;
       }
 
       /* === SIDEBAR === */
@@ -796,28 +786,7 @@
   </head>
   <body>
     <div class="app">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="logo">X</div>
-          <div>Xynth AI<small>Model 1.2</small></div>
-        </div>
-        <button class="btn primary" id="newChat">＋ New chat</button>
-
-        <div class="section-title">Models · today's tokens</div>
-        <div class="scroll-area" id="modelList" style="flex: 1"></div>
-
-        <button class="btn" id="speakToggle" title="Read replies out loud">
-          🔇 Speak replies: off
-        </button>
-        <button class="btn" id="resetMem">🧹 Clear memory</button>
-        <div class="footer">by Aether Aiko</div>
-      </aside>
-
       <main class="main">
-        <div class="topbar">
-          <h1><span class="status-dot"></span>Xynth AI</h1>
-          <span class="pill" id="activeModel">…</span>
-        </div>
         <div class="messages" id="messages">
           <div class="empty" id="empty">
             <h2>What can I do for you today?</h2>
@@ -857,16 +826,8 @@
               rows="1"
             ></textarea>
             <button class="mic" id="mic" title="Hold or click to talk">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="9" y="2" width="6" height="12" rx="3" />
-                <path d="M5 11a7 7 0 0 0 14 0M12 18v4" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5v14M7 5v14M22 10v4M2 10v4"/>
               </svg>
             </button>
             <button class="send" id="send" title="Send">
@@ -883,8 +844,7 @@
             </button>
           </div>
           <div class="hint">
-            Enter to send · Shift+Enter for newline · 🎤 click to talk · Xynth
-            can browse, see images, run code
+            Enter to send · Shift+Enter for newline · 🎙️ Voice · Xynth can browse, see images, run code
           </div>
         </div>
       </main>
@@ -1047,6 +1007,7 @@
         const activeChips = {}; // toolName -> latest chip element pending
         let pendingImagePlaceholder = null;
         let firstTextReceived = false;
+        let toolCount = 0;
 
         // Build SSE URL
         const url = `/chat/stream?session_id=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(text)}`;
@@ -1065,30 +1026,27 @@
             if (evt.name === "generate_image") {
               pendingImagePlaceholder = addImagePlaceholder(ui.wrap);
             }
+            ui.tools.innerHTML = ""; // Clear any previous tool to show one by one
+            toolCount++;
             const chip = addToolChip(ui.tools, evt.name, evt.args);
             activeChips[evt.name] = chip;
           } else if (evt.type === "tool_end") {
-            completeToolChip(activeChips[evt.name]);
-            delete activeChips[evt.name];
+            if (activeChips[evt.name]) {
+              activeChips[evt.name].remove(); // Remove immediately after it's done
+              delete activeChips[evt.name];
+            }
             // If image URL came back, swap the placeholder
             if (evt.image_url && pendingImagePlaceholder) {
               replacePlaceholderWithImage(
                 pendingImagePlaceholder,
-                evt.image_url,
+                "/proxy/image?url=" + encodeURIComponent(evt.image_url),
               );
               pendingImagePlaceholder = null;
             }
           } else if (evt.type === "image") {
             if (pendingImagePlaceholder) {
-              replacePlaceholderWithImage(pendingImagePlaceholder, evt.url);
+              replacePlaceholderWithImage(pendingImagePlaceholder, "/proxy/image?url=" + encodeURIComponent(evt.url));
               pendingImagePlaceholder = null;
-            } else {
-              const img = document.createElement("img");
-              img.src = evt.url;
-              img.style.maxWidth = "420px";
-              img.style.borderRadius = "12px";
-              img.style.margin = "6px 0";
-              ui.wrap.insertBefore(img, ui.bubble);
             }
           } else if (evt.type === "text") {
             if (!firstTextReceived) {
@@ -1117,8 +1075,12 @@
               ui.bubble.innerHTML =
                 '<em style="color:var(--muted)">(no text reply — check tool results above)</em>';
             }
-            // Mark any leftover spinning chips as done
-            Object.values(activeChips).forEach(completeToolChip);
+            
+            // Clear tools and add summary
+            ui.tools.innerHTML = "";
+            if (toolCount > 0) {
+              ui.tools.innerHTML = `<div style="font-size: 11.5px; color: var(--muted-2); margin-bottom: 8px; margin-left: 4px; font-weight: 500;">✓ Completed ${toolCount} background task${toolCount !== 1 ? 's' : ''}</div>`;
+            }
             if (pendingImagePlaceholder) {
               pendingImagePlaceholder.remove();
               pendingImagePlaceholder = null;
@@ -1245,31 +1207,37 @@
         });
       });
 
-      $("#newChat").addEventListener("click", () => {
-        const id = "web-" + Math.random().toString(36).slice(2, 10);
-        localStorage.setItem("xynth_session", id);
-        location.reload();
-      });
+      const newChatBtn = $("#newChat");
+      if (newChatBtn) {
+        newChatBtn.addEventListener("click", () => {
+          const id = "web-" + Math.random().toString(36).slice(2, 10);
+          localStorage.setItem("xynth_session", id);
+          location.reload();
+        });
+      }
 
       // === Text-to-speech (read replies aloud) ===
       let speakOn = localStorage.getItem("xynth_speak") === "1";
       const speakBtn = $("#speakToggle");
       function refreshSpeakBtn() {
+        if (!speakBtn) return;
         speakBtn.textContent = speakOn
           ? "🔊 Speak replies: on"
           : "🔇 Speak replies: off";
         speakBtn.style.borderColor = speakOn ? "var(--accent)" : "";
       }
       refreshSpeakBtn();
-      speakBtn.addEventListener("click", () => {
-        speakOn = !speakOn;
-        localStorage.setItem("xynth_speak", speakOn ? "1" : "0");
-        refreshSpeakBtn();
-        if (!speakOn)
-          try {
-            window.speechSynthesis.cancel();
-          } catch {}
-      });
+      if (speakBtn) {
+        speakBtn.addEventListener("click", () => {
+          speakOn = !speakOn;
+          localStorage.setItem("xynth_speak", speakOn ? "1" : "0");
+          refreshSpeakBtn();
+          if (!speakOn)
+            try {
+              window.speechSynthesis.cancel();
+            } catch {}
+        });
+      }
 
       function stripForSpeech(md) {
         return (md || "")
@@ -1307,16 +1275,19 @@
       if ("speechSynthesis" in window)
         window.speechSynthesis.onvoiceschanged = () => {};
 
-      $("#resetMem").addEventListener("click", async () => {
-        await fetch("/reset", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId }),
+      const resetMemBtn = $("#resetMem");
+      if (resetMemBtn) {
+        resetMemBtn.addEventListener("click", async () => {
+          await fetch("/reset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId }),
+          });
+          messagesEl.innerHTML = "";
+          const ui = appendBotMessage();
+          ui.bubble.innerHTML = "🧹 Memory cleared. Fresh start!";
         });
-        messagesEl.innerHTML = "";
-        const ui = appendBotMessage();
-        ui.bubble.innerHTML = "🧹 Memory cleared. Fresh start!";
-      });
+      }
 
       function fmt(n) {
         return n.toLocaleString();
@@ -1326,32 +1297,33 @@
         try {
           const r = await fetch("/usage");
           const j = await r.json();
-          activeModelEl.textContent = j.active;
-          modelListEl.innerHTML = "";
-          j.models.forEach((m) => {
-            const pct = Math.min(100, m.pct || 0);
-            const cls = pct > 80 ? "danger" : pct > 50 ? "warn" : "";
-            const el = document.createElement("div");
-            el.className =
-              "model-item" + (m.model === j.active ? " active" : "");
-            el.innerHTML = `
+          if (activeModelEl) activeModelEl.textContent = j.active;
+          if (modelListEl) {
+            modelListEl.innerHTML = "";
+            j.models.forEach((m) => {
+              const pct = Math.min(100, m.pct || 0);
+              const cls = pct > 80 ? "danger" : pct > 50 ? "warn" : "";
+              const el = document.createElement("div");
+              el.className = "model-item" + (m.model === j.active ? " active" : "");
+              el.innerHTML = `
         <div class="row1">
-          <span class="name">${escapeHtml(m.model)}</span>
-          <span class="pct">${fmt(m.used)}/${fmt(m.limit)}</span>
+          <span class="m-name">${m.model}</span>
+          <span class="m-tok">${fmt(m.used)} / ${fmt(m.limit)}</span>
         </div>
         <div class="bar"><i class="${cls}" style="width:${pct}%"></i></div>`;
-            el.addEventListener("click", async () => {
-              await fetch("/models", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ model: m.model }),
+              el.addEventListener("click", async () => {
+                await fetch("/models", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ model: m.model }),
+                });
+                loadUsage();
               });
-              loadUsage();
+              modelListEl.appendChild(el);
             });
-            modelListEl.appendChild(el);
-          });
+          }
         } catch (e) {
-          /* ignore */
+          console.error("Failed to load usage", e);
         }
       }
       loadUsage();
