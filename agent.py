@@ -543,8 +543,12 @@ CURRENT DATE: {_TODAY_STR}. Use this as the real "today" — trust it over any o
 IDENTITY (NEVER break):
 - If asked who made you / which model / API / LLM / "under the hood": say "I'm Xynth AI running on the Xynth Model 1.2, made by Aether Aiko". NEVER mention Groq, OpenAI, GPT, Llama, Meta, Qwen, Alibaba, ChatGPT, DashScope, or any third-party AI company. Never say "I am an AI language model" — say "I am Xynth".
 
-PERSONALITY:
-- Talk like a warm, casual friend, not a corporate assistant. Match the user's language (English, Sinhala, Singlish, etc.). Use 1–3 fitting emojis per reply (👋 ✅ 😬 💡 🎉 ⏰ 🖼️ 🔗 🔎 💸 🔥 🤔). Skip emojis for serious topics.
+PERSONALITY & RULES (CRITICAL):
+- Talk like a warm, casual friend, not a corporate assistant. Match the user's language (English, Sinhala, Singlish, etc.).
+- BE BRUTALLY HONEST. Do not agree with the user for everything. If the user is wrong, the user is wrong. Point it out directly. No excuses. Do not sugarcoat.
+- DO NOT use emojis unless the user sends them first. Reduce emoji use significantly.
+- DO NOT generate pictures or paint a picture unless the user explicitly tells you to do so.
+- STRUCTURE YOUR REPLIES. Use Markdown tables for data or comparisons. Use bullet points to point things out clearly. Make your answers highly structured and visually easy to read.
 
 DO-IT MINDSET (very important):
 - You CAN see, read, and interact with websites — through your browser tools and a vision AI. You CAN take screenshots. You CAN scrape pages. You CAN fill forms and click buttons. You CAN send emails, generate images, schedule tasks, run Python.
@@ -715,6 +719,7 @@ class XynthRunner:
             raise RuntimeError("No models could be initialised.")
         self.current_idx = 0
         self.seen_sessions = set()  # (model_name, session_id) -> seen system prompt?
+        self.thread_mapping = {}
         # usage: {YYYY-MM-DD: {model: {"in":int,"out":int,"total":int}}}
         self.usage = {}
 
@@ -798,7 +803,8 @@ class XynthRunner:
         """
         agent = self.current_agent
         model = self.current_model
-        key = (model, session_id)
+        mapped_session = self.thread_mapping.get(session_id, session_id)
+        key = (model, mapped_session)
         is_first = key not in self.seen_sessions
         self.seen_sessions.add(key)
         msgs = (
@@ -806,7 +812,7 @@ class XynthRunner:
             if is_first
             else [HumanMessage(content=message)]
         )
-        config = {"configurable": {"thread_id": session_id}, "recursion_limit": 5000}
+        config = {"configurable": {"thread_id": mapped_session}, "recursion_limit": 5000}
         yield {"type": "status", "stage": "start", "model": model}
 
         # Track pending tool calls so we can match results
@@ -862,6 +868,11 @@ class XynthRunner:
                     # Recurse on the new model
                     yield from self.stream_run(session_id, message)
                     return
+            if "invalid_chat_history" in low or "do not have a corresponding toolmessage" in low:
+                self.thread_mapping[session_id] = session_id + "_" + str(time.time())
+                yield {"type": "status", "stage": "healing", "message": "Corrupt memory detected, healing thread..."}
+                yield from self.stream_run(session_id, message)
+                return
             yield {"type": "error", "message": err}
             yield {"type": "done"}
 
@@ -874,7 +885,8 @@ class XynthRunner:
             attempts += 1
             agent = self.current_agent
             model = self.current_model
-            key = (model, session_id)
+            mapped_session = self.thread_mapping.get(session_id, session_id)
+            key = (model, mapped_session)
             is_first = key not in self.seen_sessions
             self.seen_sessions.add(key)
             msgs = (
@@ -883,7 +895,7 @@ class XynthRunner:
                 else [HumanMessage(content=current_message)]
             )
             try:
-                return self._invoke(agent, msgs, session_id)
+                return self._invoke(agent, msgs, mapped_session)
             except Exception as e:
                 err = str(e)
                 last_err = err
@@ -916,6 +928,10 @@ class XynthRunner:
                         + "\n\n(Reminder: use the minimum number of tool calls. "
                         "Pick ONE tool per need. Stop and answer once you have enough info.)"
                     )
+                    continue
+                if "invalid_chat_history" in low or "do not have a corresponding toolmessage" in low:
+                    self.thread_mapping[session_id] = session_id + "_" + str(time.time())
+                    print(f"🧹 Corrupted memory healed for {session_id}.")
                     continue
                 return f"❌ Error: {err}"
         return f"❌ Could not produce a reply after {attempts} attempts. Last error: {last_err}"

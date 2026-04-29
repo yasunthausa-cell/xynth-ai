@@ -9,7 +9,6 @@ langchain-core
 langgraph-checkpoint
 playwright
 flask
-twilio
 apscheduler
 pytz
 langchain-openai

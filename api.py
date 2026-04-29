@@ -11,7 +11,6 @@ import traceback
 import concurrent.futures
 from flask import Flask, request, jsonify, Response, send_from_directory, render_template
 from langchain_core.messages import HumanMessage
-from twilio.twiml.messaging_response import MessagingResponse
 
 from agent import XynthRunner
 import scheduler as _sched
@@ -23,7 +22,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app = Flask(__name__)
 print("🚀 Initialising Xynth model chain…")
 runner = XynthRunner()
-print(f"Twilio configured: {_msg.configured()}, from={_msg.TWILIO_FROM!r}")
+print(f"Meta WA configured: {_msg.configured()}")
 
 
 def _run_agent(session_id: str, message: str) -> str:
@@ -42,7 +41,7 @@ def home():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "twilio_configured": _msg.configured()})
+    return jsonify({"status": "ok", "meta_wa_configured": _msg.configured()})
 
 
 @app.route("/models", methods=["GET", "POST"])
@@ -202,39 +201,58 @@ def _process_whatsapp_async(from_number: str, body: str):
 _sched.init_scheduler(run_agent_fn=_run_agent, send_whatsapp_fn=_send_whatsapp)
 
 
-@app.route("/whatsapp", methods=["POST"])
+@app.route("/whatsapp", methods=["GET", "POST"])
 def whatsapp_webhook():
-    """Twilio WhatsApp webhook. Twilio sends form-encoded data.
+    """Meta WhatsApp Cloud API webhook."""
+    if request.method == "GET":
+        # Meta webhook verification
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+        
+        verify_token = os.environ.get("META_WA_VERIFY_TOKEN", "")
+        if mode == "subscribe" and token == verify_token:
+            return challenge, 200
+        return "Forbidden", 403
 
-    To avoid Twilio's 15s webhook timeout, we acknowledge immediately and
-    process the agent in a background thread. The real reply is sent via
-    Twilio's REST API when the agent finishes.
-    """
-    from_number = request.form.get("From", "")          # e.g. "whatsapp:+1234567890"
-    body = (request.form.get("Body") or "").strip()
-    print(f"💬 WhatsApp from {from_number}: {body[:80]}")
-
-    twiml = MessagingResponse()
-
-    if not body:
-        twiml.message("(empty message)")
-        return Response(str(twiml), mimetype="application/xml")
-
-    if not _msg.configured():
-        # Fallback: synchronous reply if Twilio REST isn't configured.
-        reply = _run_agent(f"wa-{from_number}", body)
-        twiml.message(_chunk_for_whatsapp(reply)[0] if reply else "(no response)")
-        return Response(str(twiml), mimetype="application/xml")
-
-    # Kick off background processing and immediately return a typing indicator.
-    threading.Thread(
-        target=_process_whatsapp_async,
-        args=(from_number, body),
-        daemon=True,
-    ).start()
-
-    twiml.message("🤖 Thinking…")
-    return Response(str(twiml), mimetype="application/xml")
+    # Handle POST (incoming messages)
+    data = request.get_json(silent=True) or {}
+    
+    # Extract message details
+    try:
+        entry = data.get("entry", [])[0]
+        changes = entry.get("changes", [])[0]
+        value = changes.get("value", {})
+        messages = value.get("messages", [])
+        
+        if not messages:
+            # Maybe a status update, just acknowledge
+            return "OK", 200
+            
+        message = messages[0]
+        from_number = message.get("from", "")
+        
+        # Meta can send different types, handle text for now
+        msg_type = message.get("type", "")
+        if msg_type == "text":
+            body = message.get("text", {}).get("body", "").strip()
+        else:
+            body = f"(User sent a {msg_type} message which is not supported yet)"
+            
+        print(f"💬 WhatsApp from {from_number}: {body[:80]}")
+        
+        if body:
+            # Kick off background processing and return 200 immediately
+            threading.Thread(
+                target=_process_whatsapp_async,
+                args=(from_number, body),
+                daemon=True,
+            ).start()
+            
+    except Exception as e:
+        print(f"Error parsing Meta WhatsApp webhook: {e}")
+        
+    return "OK", 200
 
 
 if __name__ == "__main__":

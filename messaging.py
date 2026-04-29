@@ -1,23 +1,21 @@
-"""Shared WhatsApp messaging helpers (Twilio-backed).
+"""Shared WhatsApp messaging helpers (Meta Cloud API).
 
 Centralised so that both the webhook handler (api.py) and agent tools (agent.py)
-can send WhatsApp messages and images without duplicating Twilio setup.
+can send WhatsApp messages and images without duplicating setup.
 """
 import os
-from twilio.rest import Client as TwilioClient
+import requests
 
-TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID")
-TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
-_raw_from = (os.environ.get("TWILIO_WHATSAPP_NUMBER") or "").strip()
-if _raw_from and not _raw_from.startswith("whatsapp:"):
-    _raw_from = "whatsapp:" + _raw_from
-TWILIO_FROM = _raw_from
-_twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN) if (TWILIO_SID and TWILIO_TOKEN) else None
-
+META_WA_PHONE_NUMBER_ID = os.environ.get("META_WA_PHONE_NUMBER_ID", "").strip()
+META_WA_ACCESS_TOKEN = os.environ.get("META_WA_ACCESS_TOKEN", "").strip()
 
 def configured() -> bool:
-    return bool(_twilio and TWILIO_FROM)
+    return bool(META_WA_PHONE_NUMBER_ID and META_WA_ACCESS_TOKEN)
 
+def _clean_number(number: str) -> str:
+    """Remove 'whatsapp:' prefix and '+' from phone number."""
+    number = number.replace("whatsapp:", "").replace("+", "")
+    return number
 
 def chunk_text(text: str, limit: int = 1500):
     text = text or ""
@@ -32,36 +30,68 @@ def chunk_text(text: str, limit: int = 1500):
         chunks.append(text)
     return chunks
 
-
 def send_text(to_number: str, text: str) -> bool:
     if not configured():
-        print("⚠️  Twilio not configured.")
+        print("⚠️  Meta WhatsApp API not configured.")
         return False
+    
+    clean_to = _clean_number(to_number)
+    url = f"https://graph.facebook.com/v18.0/{META_WA_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WA_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
     ok = True
     for chunk in chunk_text(text):
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": clean_to,
+            "type": "text",
+            "text": {"preview_url": False, "body": chunk}
+        }
         try:
-            _twilio.messages.create(from_=TWILIO_FROM, to=to_number, body=chunk)
+            r = requests.post(url, headers=headers, json=payload, timeout=10)
+            r.raise_for_status()
         except Exception as e:
-            print(f"Failed to send WhatsApp text to {to_number}: {e}")
+            err_text = getattr(e.response, 'text', '') if hasattr(e, 'response') else str(e)
+            print(f"Failed to send WhatsApp text to {to_number}: {err_text}")
             ok = False
     return ok
 
-
 def send_image(to_number: str, image_url: str, caption: str = "") -> bool:
-    """Send an image (or other media) via Twilio WhatsApp.
+    """Send an image (or other media) via Meta WhatsApp API.
     The image_url MUST be a publicly reachable HTTPS URL.
     """
     if not configured():
-        print("⚠️  Twilio not configured.")
+        print("⚠️  Meta WhatsApp API not configured.")
         return False
+    
+    clean_to = _clean_number(to_number)
+    url = f"https://graph.facebook.com/v18.0/{META_WA_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {META_WA_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": clean_to,
+        "type": "image",
+        "image": {
+            "link": image_url
+        }
+    }
+    if caption:
+        payload["image"]["caption"] = caption
+        
     try:
-        _twilio.messages.create(
-            from_=TWILIO_FROM,
-            to=to_number,
-            body=caption or "",
-            media_url=[image_url],
-        )
+        r = requests.post(url, headers=headers, json=payload, timeout=10)
+        r.raise_for_status()
         return True
     except Exception as e:
-        print(f"Failed to send WhatsApp image to {to_number}: {e}")
+        err_text = getattr(e.response, 'text', '') if hasattr(e, 'response') else str(e)
+        print(f"Failed to send WhatsApp image to {to_number}: {err_text}")
         return False
