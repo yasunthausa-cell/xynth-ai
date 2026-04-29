@@ -4,96 +4,226 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Xynth AI</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root{
-    --bg:#0b0d12; --panel:#11141b; --panel-2:#171b24; --line:#222836;
-    --text:#e7ecf3; --muted:#8a93a4; --accent:#7c5cff; --accent-2:#22d3ee;
-    --user:#1b2030; --assistant:#11141b; --shadow:0 6px 24px rgba(0,0,0,.35);
+    --bg:#06070b; --bg-2:#0c0f17; --panel:#0f1320; --panel-2:#161b2c;
+    --line:#1f2638; --line-2:#2a3247;
+    --text:#eef2f8; --muted:#8d97ad; --muted-2:#5c6478;
+    --accent:#7c5cff; --accent-2:#22d3ee; --accent-3:#ec4899;
+    --user-bubble:linear-gradient(135deg,#7c5cff,#5b8cff);
+    --bot-bubble:#11162236;
+    --tool-bg:#11182860; --tool-border:#22304a;
+    --shadow:0 10px 40px rgba(0,0,0,.4);
+    --radius:16px;
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;}
-  .app{display:grid;grid-template-columns:260px 1fr;height:100vh;}
-  /* Sidebar */
-  .sidebar{background:var(--panel);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:14px;}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.2px;}
-  .brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:#0b0d12;font-weight:900;}
-  .btn{appearance:none;border:1px solid var(--line);background:var(--panel-2);color:var(--text);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:14px;text-align:left;transition:.15s;}
-  .btn:hover{border-color:#384258;background:#1c2230}
-  .section-title{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin:6px 4px;}
-  .model-list{display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;}
-  .model-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);border:1px solid transparent;}
+  html,body{height:100%;margin:0}
+  body{
+    background:radial-gradient(1200px 600px at 80% -10%,rgba(124,92,255,.15),transparent 60%),
+               radial-gradient(900px 500px at -10% 110%,rgba(34,211,238,.12),transparent 60%),
+               var(--bg);
+    color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    overflow:hidden;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#2a3247;border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:#3a4566}
+  .app{display:grid;grid-template-columns:280px 1fr;height:100vh;}
+
+  /* === SIDEBAR === */
+  .sidebar{background:rgba(15,19,32,.75);backdrop-filter:blur(20px);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:14px;overflow:hidden;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:.2px;padding:0 4px}
+  .brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:#06070b;font-weight:900;font-size:18px;box-shadow:0 6px 20px rgba(124,92,255,.4);}
+  .brand small{display:block;font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-top:2px;}
+
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel-2);color:var(--text);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:13.5px;text-align:left;transition:.15s;font-family:inherit;font-weight:500;}
+  .btn:hover{border-color:var(--accent);background:#1c2230}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#5b8cff);border-color:transparent;color:#fff;text-align:center;font-weight:600;}
+  .btn.primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,92,255,.4);}
+
+  .section-title{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin:8px 6px 4px;font-weight:600;}
+
+  .scroll-area{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px;}
+
+  .model-item{padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:var(--muted);border:1px solid transparent;transition:.15s;display:flex;flex-direction:column;gap:6px;}
   .model-item:hover{background:var(--panel-2);color:var(--text)}
-  .model-item.active{background:var(--panel-2);color:var(--text);border-color:var(--accent)}
-  .footer{margin-top:auto;color:var(--muted);font-size:12px;text-align:center;}
-  /* Main chat */
-  .main{display:flex;flex-direction:column;min-width:0;}
-  .topbar{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:rgba(11,13,18,.6);backdrop-filter:blur(8px);}
-  .topbar h1{margin:0;font-size:15px;font-weight:600;}
-  .pill{font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);}
-  .messages{flex:1;overflow-y:auto;padding:24px 0;}
-  .msg{max-width:780px;margin:0 auto 16px;padding:0 22px;display:flex;gap:12px;}
-  .avatar{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:grid;place-items:center;font-weight:700;font-size:13px;}
-  .avatar.user{background:#2b3247;color:#cfd6e6;}
-  .avatar.bot{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0b0d12;}
-  .bubble{background:var(--assistant);border:1px solid var(--line);padding:12px 14px;border-radius:12px;flex:1;white-space:pre-wrap;word-wrap:break-word;}
-  .msg.user .bubble{background:var(--user);}
-  .empty{max-width:560px;margin:14vh auto 0;text-align:center;color:var(--muted);}
-  .empty h2{color:var(--text);font-size:26px;margin:0 0 6px;}
-  .empty .suggest{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px;}
-  .empty .suggest div{border:1px solid var(--line);background:var(--panel);padding:12px;border-radius:10px;cursor:pointer;text-align:left;font-size:13px;color:var(--text);transition:.15s;}
-  .empty .suggest div:hover{border-color:var(--accent);background:var(--panel-2)}
-  /* Input */
-  .composer{padding:14px 22px 22px;border-top:1px solid var(--line);background:var(--bg);}
-  .composer-inner{max-width:780px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px;display:flex;align-items:flex-end;gap:8px;box-shadow:var(--shadow);}
-  textarea{flex:1;background:transparent;border:0;outline:0;color:var(--text);resize:none;font:inherit;padding:10px 8px;max-height:180px;min-height:24px;}
-  .send{appearance:none;border:0;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0b0d12;font-weight:700;border-radius:10px;padding:10px 14px;cursor:pointer;}
-  .send:disabled{opacity:.5;cursor:not-allowed;}
-  .typing{display:inline-flex;gap:3px;padding:4px 0;}
-  .typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bounce 1.2s infinite ease-in-out;}
-  .typing span:nth-child(2){animation-delay:.15s}
-  .typing span:nth-child(3){animation-delay:.3s}
-  @keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-4px);opacity:1}}
-  .hint{color:var(--muted);font-size:11px;text-align:center;margin-top:6px;}
-  @media(max-width:780px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+  .model-item.active{background:linear-gradient(135deg,rgba(124,92,255,.15),rgba(34,211,238,.08));color:var(--text);border-color:rgba(124,92,255,.5);}
+  .model-item .row1{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .model-item .name{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .model-item .pct{font-size:10px;color:var(--muted-2);font-variant-numeric:tabular-nums;}
+  .bar{height:4px;background:#1a2032;border-radius:2px;overflow:hidden;}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;transition:width .4s ease;}
+  .bar > i.warn{background:linear-gradient(90deg,#fbbf24,#fb923c);}
+  .bar > i.danger{background:linear-gradient(90deg,#f43f5e,#ec4899);}
+
+  .footer{margin-top:auto;color:var(--muted);font-size:11px;text-align:center;padding-top:8px;border-top:1px solid var(--line);}
+
+  /* === MAIN === */
+  .main{display:flex;flex-direction:column;min-width:0;background:var(--bg);}
+  .topbar{padding:14px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:rgba(6,7,11,.5);backdrop-filter:blur(12px);}
+  .topbar h1{margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px;}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2);animation:pulse 2s infinite;}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+  .pill{font-size:11.5px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-variant-numeric:tabular-nums;}
+
+  .messages{flex:1;overflow-y:auto;padding:24px 0 12px;}
+  .empty{max-width:680px;margin:14vh auto 0;text-align:center;padding:0 22px;}
+  .empty h2{font-size:32px;margin:0 0 10px;background:linear-gradient(135deg,var(--text),#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700;}
+  .empty p{color:var(--muted);margin:0 0 30px;}
+  .suggest{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .suggest div{border:1px solid var(--line);background:var(--panel);padding:14px;border-radius:12px;cursor:pointer;text-align:left;font-size:13.5px;color:var(--text);transition:.15s;}
+  .suggest div:hover{border-color:var(--accent);background:var(--panel-2);transform:translateY(-2px);}
+  .suggest div .icon{font-size:18px;margin-bottom:6px;display:block;}
+
+  /* Message bubbles */
+  .msg{max-width:860px;margin:0 auto 18px;padding:0 22px;display:flex;gap:12px;animation:slide-in .3s ease-out;}
+  @keyframes slide-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .msg.user{flex-direction:row-reverse;}
+  .avatar{width:32px;height:32px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-weight:700;font-size:13px;}
+  .avatar.user{background:linear-gradient(135deg,#5b8cff,#7c5cff);color:#fff;}
+  .avatar.bot{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#06070b;box-shadow:0 4px 12px rgba(124,92,255,.3);}
+  .bubble-wrap{display:flex;flex-direction:column;gap:8px;max-width:78%;}
+  .msg.user .bubble-wrap{align-items:flex-end;}
+  .bubble{
+    padding:12px 16px;border-radius:16px;
+    word-wrap:break-word;font-size:14.5px;line-height:1.6;
+  }
+  .msg.user .bubble{background:var(--user-bubble);color:#fff;border-bottom-right-radius:4px;}
+  .msg.bot  .bubble{background:var(--bot-bubble);border:1px solid var(--line);border-bottom-left-radius:4px;backdrop-filter:blur(10px);}
+  .bubble :is(p,ul,ol){margin:0 0 8px;}
+  .bubble :is(p,ul,ol):last-child{margin-bottom:0;}
+  .bubble code{background:#000a;padding:2px 6px;border-radius:4px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .bubble pre{background:#000a;padding:12px;border-radius:8px;overflow-x:auto;border:1px solid var(--line);margin:8px 0;}
+  .bubble pre code{background:transparent;padding:0;}
+  .bubble a{color:var(--accent-2);text-decoration:none;}
+  .bubble a:hover{text-decoration:underline;}
+  .bubble img{max-width:100%;border-radius:10px;display:block;margin:6px 0;}
+  .bubble h1,.bubble h2,.bubble h3{margin:10px 0 6px;font-weight:700;}
+  .bubble blockquote{border-left:3px solid var(--accent);padding-left:10px;color:var(--muted);margin:8px 0;}
+
+  /* Tool indicators */
+  .tools-strip{display:flex;flex-direction:column;gap:6px;}
+  .tool-chip{
+    display:flex;align-items:center;gap:8px;
+    background:var(--tool-bg);border:1px solid var(--tool-border);
+    border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);
+    animation:slide-in .25s ease-out;
+  }
+  .tool-chip.active{border-color:rgba(124,92,255,.5);color:var(--text);background:linear-gradient(90deg,rgba(124,92,255,.1),rgba(34,211,238,.05));}
+  .tool-chip.done{opacity:.7;}
+  .tool-chip .ti{width:14px;height:14px;flex-shrink:0;}
+  .tool-chip .name{font-weight:600;color:var(--text);}
+  .tool-chip .args{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:480px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;}
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(124,92,255,.3);border-top-color:var(--accent);animation:spin 1s linear infinite;flex-shrink:0;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .check{color:#10b981;font-size:14px;flex-shrink:0;}
+
+  /* Image generation placeholder */
+  .image-loader{
+    width:280px;height:280px;border-radius:12px;
+    background:linear-gradient(135deg,rgba(124,92,255,.08),rgba(34,211,238,.05));
+    border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    margin:6px 0;position:relative;overflow:hidden;
+  }
+  .image-loader::before{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(110deg,transparent 30%,rgba(124,92,255,.2) 50%,transparent 70%);
+    animation:shimmer 1.6s infinite;
+  }
+  @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .image-loader .spinner{width:34px;height:34px;border-width:3px;}
+  .image-loader .label{color:var(--muted);font-size:13px;z-index:1;}
+
+  /* Typing dots (initial wait) */
+  .typing{display:inline-flex;gap:4px;padding:4px 0;}
+  .typing span{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:bounce 1.2s infinite ease-in-out;}
+  .typing span:nth-child(2){animation-delay:.15s;background:#5b8cff;}
+  .typing span:nth-child(3){animation-delay:.3s;background:var(--accent-2);}
+  @keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
+
+  /* === COMPOSER === */
+  .composer{padding:14px 22px 20px;border-top:1px solid var(--line);background:rgba(6,7,11,.7);backdrop-filter:blur(10px);}
+  .composer-inner{
+    max-width:860px;margin:0 auto;
+    background:var(--panel);border:1px solid var(--line-2);border-radius:18px;
+    padding:8px;display:flex;align-items:flex-end;gap:8px;
+    box-shadow:var(--shadow);transition:.2s;
+  }
+  .composer-inner:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.15),var(--shadow);}
+  textarea{flex:1;background:transparent;border:0;outline:0;color:var(--text);resize:none;font:inherit;padding:10px 10px;max-height:180px;min-height:24px;line-height:1.5;}
+  textarea::placeholder{color:var(--muted-2);}
+  .send{
+    appearance:none;border:0;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#06070b;font-weight:700;border-radius:12px;
+    padding:10px 14px;cursor:pointer;height:40px;display:grid;place-items:center;
+    transition:.15s;
+  }
+  .send:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,92,255,.4);}
+  .send:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+  .send svg{width:18px;height:18px;}
+  .hint{color:var(--muted-2);font-size:11px;text-align:center;margin-top:8px;}
+
+  @media(max-width:780px){
+    .app{grid-template-columns:1fr}
+    .sidebar{display:none}
+    .bubble-wrap{max-width:88%;}
+    .empty h2{font-size:24px}
+    .suggest{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">X</div>Xynth AI</div>
-    <button class="btn" id="newChat">＋ New chat</button>
+    <div class="brand">
+      <div class="logo">X</div>
+      <div>Xynth AI<small>Model 1.2</small></div>
+    </div>
+    <button class="btn primary" id="newChat">＋ New chat</button>
 
-    <div class="section-title">Model</div>
-    <div class="model-list" id="modelList"></div>
+    <div class="section-title">Models · today's tokens</div>
+    <div class="scroll-area" id="modelList" style="flex:1;"></div>
 
     <button class="btn" id="resetMem">🧹 Clear memory</button>
-    <div class="footer">Xynth Model 1.2 · by Aether Aiko</div>
+    <div class="footer">by Aether Aiko</div>
   </aside>
 
   <main class="main">
     <div class="topbar">
-      <h1>Xynth AI</h1>
-      <span class="pill" id="activeModel">model: …</span>
+      <h1><span class="status-dot"></span>Xynth AI</h1>
+      <span class="pill" id="activeModel">…</span>
     </div>
     <div class="messages" id="messages">
       <div class="empty" id="empty">
         <h2>What can I do for you today?</h2>
-        <div>Ask anything. I can search the web, read pages, generate images, send emails, schedule reminders, and more.</div>
+        <p>I can search the web, read pages, generate images, send emails, schedule reminders, and more.</p>
         <div class="suggest">
-          <div data-prompt="Visit stripe.com and tell me if it looks beautiful.">Critique a website's design</div>
-          <div data-prompt="Generate an image of a futuristic Colombo skyline at sunset.">Generate an image</div>
-          <div data-prompt="Search the web for today's top tech news and summarise the top 3 stories.">Summarise today's tech news</div>
-          <div data-prompt="What's the current price of GitHub Team plan per user?">Look up live pricing</div>
+          <div data-prompt="Visit stripe.com and tell me what you think of its design.">
+            <span class="icon">🎨</span>Critique a website's design
+          </div>
+          <div data-prompt="Generate an image of a futuristic Colombo skyline at golden hour.">
+            <span class="icon">🖼️</span>Generate an image
+          </div>
+          <div data-prompt="Search the web for today's top tech news and summarise the top 3 stories.">
+            <span class="icon">📰</span>Today's tech news
+          </div>
+          <div data-prompt="What's the current price of GitHub Team plan per user?">
+            <span class="icon">💰</span>Look up live pricing
+          </div>
         </div>
       </div>
     </div>
     <div class="composer">
       <div class="composer-inner">
         <textarea id="input" placeholder="Message Xynth…  (Shift+Enter for newline)" rows="1"></textarea>
-        <button class="send" id="send">Send</button>
+        <button class="send" id="send" title="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
       </div>
-      <div class="hint">Press Enter to send · Shift+Enter for newline</div>
+      <div class="hint">Press Enter to send · Shift+Enter for newline · Xynth can browse, see images, and run code</div>
     </div>
   </main>
 </div>
@@ -107,57 +237,220 @@ const messagesEl = $('#messages'), emptyEl = $('#empty');
 const inputEl = $('#input'), sendBtn = $('#send');
 const modelListEl = $('#modelList'), activeModelEl = $('#activeModel');
 
-function escapeHtml(s) {
+marked.setOptions({ breaks: true, gfm: true });
+
+function escapeHtml(s){
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function appendMessage(role, text, isTyping=false) {
-  if (emptyEl) emptyEl.remove();
-  const msg = document.createElement('div');
-  msg.className = 'msg ' + role;
-  const av = document.createElement('div');
-  av.className = 'avatar ' + (role === 'user' ? 'user' : 'bot');
-  av.textContent = role === 'user' ? 'U' : 'X';
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  if (isTyping) {
-    bubble.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
-  } else {
-    bubble.innerHTML = escapeHtml(text);
-  }
-  msg.append(av, bubble);
-  messagesEl.appendChild(msg);
+function scrollToBottom(){
   messagesEl.scrollTop = messagesEl.scrollHeight;
-  return bubble;
 }
 
-async function send() {
+// Friendly labels for each tool
+const TOOL_LABELS = {
+  web_search: ['🔎','Searching the web'],
+  scrape_website: ['📄','Reading the page'],
+  browser_open: ['🌐','Opening browser'],
+  browser_get_html: ['📋','Reading page content'],
+  browser_click: ['👆','Clicking'],
+  browser_type: ['⌨️','Typing'],
+  analyze_webpage_visually: ['👁️','Looking at the page'],
+  generate_image: ['🎨','Painting an image'],
+  send_whatsapp_image: ['📤','Sending image'],
+  screenshot_and_send: ['📸','Taking a screenshot'],
+  send_email: ['✉️','Sending email'],
+  execute_python_code: ['🐍','Running code'],
+  save_text_to_file: ['💾','Saving file'],
+  call_api: ['🔌','Calling API'],
+  schedule_recurring_task: ['⏰','Scheduling task'],
+  schedule_one_time_task: ['⏰','Scheduling task'],
+  list_scheduled_tasks: ['📋','Listing tasks'],
+  cancel_scheduled_task: ['❌','Cancelling task'],
+};
+function toolLabel(name){ return TOOL_LABELS[name] || ['🔧', name]; }
+function shortArgs(args){
+  if(!args || typeof args !== 'object') return '';
+  const parts = [];
+  for(const [k,v] of Object.entries(args)){
+    let s = typeof v === 'string' ? v : JSON.stringify(v);
+    if(s.length > 60) s = s.slice(0,57)+'…';
+    parts.push(s);
+  }
+  return parts.join(' · ');
+}
+
+function appendUserMessage(text){
+  if(emptyEl) emptyEl.remove();
+  const msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.innerHTML = `
+    <div class="avatar user">U</div>
+    <div class="bubble-wrap"><div class="bubble"></div></div>`;
+  msg.querySelector('.bubble').textContent = text;
+  messagesEl.appendChild(msg);
+  scrollToBottom();
+}
+
+function appendBotMessage(){
+  if(emptyEl) emptyEl.remove();
+  const msg = document.createElement('div');
+  msg.className = 'msg bot';
+  msg.innerHTML = `
+    <div class="avatar bot">X</div>
+    <div class="bubble-wrap">
+      <div class="tools-strip"></div>
+      <div class="bubble"><span class="typing"><span></span><span></span><span></span></span></div>
+    </div>`;
+  messagesEl.appendChild(msg);
+  scrollToBottom();
+  return {
+    bubble: msg.querySelector('.bubble'),
+    tools: msg.querySelector('.tools-strip'),
+    wrap: msg.querySelector('.bubble-wrap'),
+    msg,
+  };
+}
+
+function addToolChip(toolsEl, name, args){
+  const [emoji, label] = toolLabel(name);
+  const chip = document.createElement('div');
+  chip.className = 'tool-chip active';
+  chip.dataset.tool = name;
+  chip.innerHTML = `
+    <div class="spinner"></div>
+    <span class="name">${emoji} ${escapeHtml(label)}</span>
+    <span class="args">${escapeHtml(shortArgs(args))}</span>`;
+  toolsEl.appendChild(chip);
+  scrollToBottom();
+  return chip;
+}
+
+function completeToolChip(chip){
+  if(!chip) return;
+  chip.classList.remove('active');
+  chip.classList.add('done');
+  const sp = chip.querySelector('.spinner');
+  if(sp) sp.outerHTML = '<span class="check">✓</span>';
+}
+
+function addImagePlaceholder(wrap){
+  const ph = document.createElement('div');
+  ph.className = 'image-loader';
+  ph.innerHTML = `<div class="spinner"></div><div class="label">Painting your image…</div>`;
+  // Insert before the bubble
+  wrap.insertBefore(ph, wrap.querySelector('.bubble'));
+  scrollToBottom();
+  return ph;
+}
+
+function replacePlaceholderWithImage(ph, url){
+  if(!ph) return;
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = 'Generated image';
+  img.style.maxWidth = '420px';
+  img.style.borderRadius = '12px';
+  img.style.margin = '6px 0';
+  img.onload = scrollToBottom;
+  ph.replaceWith(img);
+}
+
+async function send(){
   const text = inputEl.value.trim();
-  if (!text) return;
+  if(!text) return;
   inputEl.value = '';
   inputEl.style.height = 'auto';
   sendBtn.disabled = true;
-  appendMessage('user', text);
-  const typingBubble = appendMessage('bot', '', true);
-  try {
-    const r = await fetch('/chat', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({session_id: sessionId, message: text})
-    });
-    const j = await r.json();
-    typingBubble.innerHTML = escapeHtml(j.response || '(no response)');
-  } catch (e) {
-    typingBubble.innerHTML = '❌ ' + escapeHtml(String(e));
-  } finally {
+
+  appendUserMessage(text);
+  const ui = appendBotMessage();
+  const activeChips = {}; // toolName -> latest chip element pending
+  let pendingImagePlaceholder = null;
+  let firstTextReceived = false;
+
+  // Build SSE URL
+  const url = `/chat/stream?session_id=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(text)}`;
+  const es = new EventSource(url);
+
+  es.onmessage = (ev) => {
+    let evt;
+    try { evt = JSON.parse(ev.data); } catch { return; }
+
+    if(evt.type === 'tool_start'){
+      // If this is generate_image, also drop an image placeholder into the bubble area
+      if(evt.name === 'generate_image'){
+        pendingImagePlaceholder = addImagePlaceholder(ui.wrap);
+      }
+      const chip = addToolChip(ui.tools, evt.name, evt.args);
+      activeChips[evt.name] = chip;
+    }
+    else if(evt.type === 'tool_end'){
+      completeToolChip(activeChips[evt.name]);
+      delete activeChips[evt.name];
+      // If image URL came back, swap the placeholder
+      if(evt.image_url && pendingImagePlaceholder){
+        replacePlaceholderWithImage(pendingImagePlaceholder, evt.image_url);
+        pendingImagePlaceholder = null;
+      }
+    }
+    else if(evt.type === 'image'){
+      if(pendingImagePlaceholder){
+        replacePlaceholderWithImage(pendingImagePlaceholder, evt.url);
+        pendingImagePlaceholder = null;
+      } else {
+        const img = document.createElement('img');
+        img.src = evt.url;
+        img.style.maxWidth = '420px'; img.style.borderRadius = '12px'; img.style.margin = '6px 0';
+        ui.wrap.insertBefore(img, ui.bubble);
+      }
+    }
+    else if(evt.type === 'text'){
+      if(!firstTextReceived){
+        ui.bubble.innerHTML = '';
+        firstTextReceived = true;
+      }
+      ui.bubble.innerHTML = marked.parse(evt.content || '');
+      scrollToBottom();
+    }
+    else if(evt.type === 'usage'){
+      loadUsage(); // refresh sidebar bars
+    }
+    else if(evt.type === 'status' && evt.stage === 'fallback'){
+      const note = document.createElement('div');
+      note.className = 'tool-chip done';
+      note.innerHTML = `<span class="name">↻ Switched: ${escapeHtml(evt.from)} → ${escapeHtml(evt.to)}</span>`;
+      ui.tools.appendChild(note);
+    }
+    else if(evt.type === 'error'){
+      if(!firstTextReceived){ ui.bubble.innerHTML = ''; firstTextReceived = true; }
+      ui.bubble.innerHTML += `<div style="color:#f87171">⚠️ ${escapeHtml(evt.message)}</div>`;
+    }
+    else if(evt.type === 'done'){
+      es.close();
+      sendBtn.disabled = false;
+      if(!firstTextReceived){
+        ui.bubble.innerHTML = '<em style="color:var(--muted)">(no text reply — check tool results above)</em>';
+      }
+      // Mark any leftover spinning chips as done
+      Object.values(activeChips).forEach(completeToolChip);
+      if(pendingImagePlaceholder){ pendingImagePlaceholder.remove(); pendingImagePlaceholder = null; }
+      inputEl.focus();
+      loadUsage();
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
     sendBtn.disabled = false;
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    inputEl.focus();
-  }
+    if(!firstTextReceived){
+      ui.bubble.innerHTML = '<span style="color:#f87171">Connection lost. Try again.</span>';
+    }
+  };
 }
 
 inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
 });
 inputEl.addEventListener('input', () => {
   inputEl.style.height = 'auto';
@@ -182,26 +475,39 @@ $('#newChat').addEventListener('click', () => {
 $('#resetMem').addEventListener('click', async () => {
   await fetch('/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: sessionId})});
   messagesEl.innerHTML = '';
-  appendMessage('bot', '🧹 Memory cleared. Fresh start!');
+  const ui = appendBotMessage();
+  ui.bubble.innerHTML = '🧹 Memory cleared. Fresh start!';
 });
 
-async function loadModels() {
-  const r = await fetch('/models');
-  const j = await r.json();
-  activeModelEl.textContent = 'model: ' + j.active;
-  modelListEl.innerHTML = '';
-  j.models.forEach(name => {
-    const el = document.createElement('div');
-    el.className = 'model-item' + (name === j.active ? ' active' : '');
-    el.innerHTML = `<span>${escapeHtml(name)}</span>${name===j.active?'<span>●</span>':''}`;
-    el.addEventListener('click', async () => {
-      await fetch('/models', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: name})});
-      loadModels();
+function fmt(n){ return n.toLocaleString(); }
+
+async function loadUsage(){
+  try {
+    const r = await fetch('/usage');
+    const j = await r.json();
+    activeModelEl.textContent = j.active;
+    modelListEl.innerHTML = '';
+    j.models.forEach(m => {
+      const pct = Math.min(100, m.pct || 0);
+      const cls = pct > 80 ? 'danger' : (pct > 50 ? 'warn' : '');
+      const el = document.createElement('div');
+      el.className = 'model-item' + (m.model === j.active ? ' active' : '');
+      el.innerHTML = `
+        <div class="row1">
+          <span class="name">${escapeHtml(m.model)}</span>
+          <span class="pct">${fmt(m.used)}/${fmt(m.limit)}</span>
+        </div>
+        <div class="bar"><i class="${cls}" style="width:${pct}%"></i></div>`;
+      el.addEventListener('click', async () => {
+        await fetch('/models', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: m.model})});
+        loadUsage();
+      });
+      modelListEl.appendChild(el);
     });
-    modelListEl.appendChild(el);
-  });
+  } catch (e) { /* ignore */ }
 }
-loadModels();
+loadUsage();
+setInterval(loadUsage, 15000);
 </script>
 </body>
 </html>

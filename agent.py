@@ -1,4 +1,5 @@
 """Shared agent setup used by both the CLI (app.py) and the HTTP API (api.py)."""
+
 import os
 import re
 import time
@@ -9,14 +10,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from bs4 import BeautifulSoup
 from langchain_groq import ChatGroq
+
 try:
-    from langchain_openai import ChatOpenAI  # for Qwen via DashScope OpenAI-compatible endpoint
+    from langchain_openai import (
+        ChatOpenAI,
+    )  # for Qwen via DashScope OpenAI-compatible endpoint
 except ImportError:  # pragma: no cover
     ChatOpenAI = None  # type: ignore
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import SystemMessage, HumanMessage
+
 try:
     from ddgs import DDGS  # newer package (preferred)
 except ImportError:  # pragma: no cover
@@ -31,9 +36,12 @@ _browser_state = {"playwright": None, "browser": None, "page": None}
 
 def _ensure_browser():
     from playwright.sync_api import sync_playwright
+
     if _browser_state["page"] is None:
         pw = sync_playwright().start()
-        browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        browser = pw.chromium.launch(
+            headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"]
+        )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
         )
@@ -65,6 +73,7 @@ def web_search(query: str, max_results: int = 5) -> str:
         max_results: How many results to return (default 5, max 10).
     """
     import time as _time
+
     max_results = max(1, min(int(max_results or 5), 8))
     last_err = None
     for attempt in range(3):
@@ -97,12 +106,14 @@ _DEFAULT_HEADERS = {
 def scrape_website(url: str) -> str:
     """Quickly fetch and extract readable text from a static website URL. Best for articles, docs, pricing pages. For dynamic sites or login flows use browser_open."""
     try:
-        response = requests.get(url, headers=_DEFAULT_HEADERS, timeout=12, allow_redirects=True)
+        response = requests.get(
+            url, headers=_DEFAULT_HEADERS, timeout=12, allow_redirects=True
+        )
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, "html.parser")
         for tag in soup(["script", "style", "noscript", "svg", "iframe"]):
             tag.extract()
-        text = ' '.join(soup.stripped_strings)
+        text = " ".join(soup.stripped_strings)
         return text[:3000] if text else "(page returned no extractable text)"
     except requests.exceptions.Timeout:
         return f"Failed to scrape {url}: request timed out after 12s. Try browser_open instead."
@@ -115,6 +126,7 @@ def execute_python_code(code: str) -> str:
     """Execute Python code and return stdout. Use for math, string manipulation, or data processing."""
     import sys
     from io import StringIO
+
     old_stdout = sys.stdout
     redirected_output = sys.stdout = StringIO()
     try:
@@ -134,7 +146,7 @@ def save_text_to_file(filename: str, content: str) -> str:
         dir_name = os.path.dirname(os.path.abspath(filename))
         if dir_name:
             os.makedirs(dir_name, exist_ok=True)
-        with open(filename, 'w', encoding='utf-8') as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
         return f"Successfully saved content to {filename}"
     except Exception as e:
@@ -248,13 +260,21 @@ def analyze_webpage_visually(url: str, question: str, full_page: bool = False) -
         client = Groq()
         resp = client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": f"You are evaluating a webpage screenshot from {url}. Answer this question concretely and with specifics from what you see: {question}"},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                ],
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"You are evaluating a webpage screenshot from {url}. Answer this question concretely and with specifics from what you see: {question}",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                        },
+                    ],
+                }
+            ],
             max_completion_tokens=900,
             temperature=0.2,
         )
@@ -273,6 +293,7 @@ def generate_image(prompt: str, width: int = 1024, height: int = 1024) -> str:
         height: Image height in pixels. Default 1024.
     """
     import urllib.parse
+
     safe = urllib.parse.quote(prompt)
     url = f"https://image.pollinations.ai/prompt/{safe}?width={width}&height={height}&nologo=true"
     return url
@@ -288,11 +309,17 @@ def send_whatsapp_image(recipient: str, image_url: str, caption: str = "") -> st
         caption: Optional caption text to accompany the image.
     """
     ok = _msg.send_image(recipient, image_url, caption)
-    return "✅ Image sent." if ok else "❌ Failed to send image (check Twilio config and that the URL is public HTTPS)."
+    return (
+        "✅ Image sent."
+        if ok
+        else "❌ Failed to send image (check Twilio config and that the URL is public HTTPS)."
+    )
 
 
 @tool
-def screenshot_and_send(recipient: str, url: str, caption: str = "", full_page: bool = False) -> str:
+def screenshot_and_send(
+    recipient: str, url: str, caption: str = "", full_page: bool = False
+) -> str:
     """Take a screenshot of a webpage and send it to the user on WhatsApp. Use when the user asks "show me what X looks like" or wants a visual of a website.
 
     Args:
@@ -302,11 +329,14 @@ def screenshot_and_send(recipient: str, url: str, caption: str = "", full_page: 
         full_page: If True capture the full scrollable page. Default False (viewport only).
     """
     import os, time, uuid
+
     try:
         page = _ensure_browser()
         page.goto(url, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(2000)
-        static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
+        static_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "static_media"
+        )
         os.makedirs(static_dir, exist_ok=True)
         filename = f"shot_{int(time.time())}_{uuid.uuid4().hex[:6]}.png"
         path = os.path.join(static_dir, filename)
@@ -317,15 +347,24 @@ def screenshot_and_send(recipient: str, url: str, caption: str = "", full_page: 
             return f"Screenshot saved to {path}, but REPLIT_DEV_DOMAIN is not set so I cannot send it."
         public_url = f"https://{host}/media/{filename}"
         ok = _msg.send_image(recipient, public_url, caption)
-        return f"✅ Screenshot of {url} sent." if ok else f"❌ Failed to send screenshot. Public URL was {public_url}."
+        return (
+            f"✅ Screenshot of {url} sent."
+            if ok
+            else f"❌ Failed to send screenshot. Public URL was {public_url}."
+        )
     except Exception as e:
         return f"Failed to screenshot {url}: {str(e)}"
 
 
 @tool
-def schedule_recurring_task(prompt: str, recipient: str, hour: int,
-                            minute: int = 0, day_of_week: str = "*",
-                            timezone: str = "UTC") -> str:
+def schedule_recurring_task(
+    prompt: str,
+    recipient: str,
+    hour: int,
+    minute: int = 0,
+    day_of_week: str = "*",
+    timezone: str = "UTC",
+) -> str:
     """Schedule a RECURRING task that runs at the same time every day or selected days. The agent will execute `prompt` at the scheduled time and send the answer to `recipient` via WhatsApp.
 
     Args:
@@ -340,8 +379,9 @@ def schedule_recurring_task(prompt: str, recipient: str, hour: int,
 
 
 @tool
-def schedule_one_time_task(prompt: str, recipient: str, run_at_iso: str,
-                           timezone: str = "UTC") -> str:
+def schedule_one_time_task(
+    prompt: str, recipient: str, run_at_iso: str, timezone: str = "UTC"
+) -> str:
     """Schedule a ONE-TIME task that runs once at a specific date/time, then is removed.
 
     Args:
@@ -367,7 +407,8 @@ def cancel_scheduled_task(job_id: str) -> str:
 
 _TODAY_STR = datetime.datetime.utcnow().strftime("%A, %d %B %Y")
 
-SYSTEM_PROMPT = SystemMessage(content=f"""You are Xynth AI (Xynth Model 1.2) by Aether Aiko — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
+SYSTEM_PROMPT = SystemMessage(
+    content=f"""You are Xynth AI (Xynth Model 1.2) by Aether Aiko — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
 
 CURRENT DATE: {_TODAY_STR}. Use this as the real "today" — trust it over any older training knowledge. If asked the year, it is {datetime.datetime.utcnow().year}.
 
@@ -397,27 +438,28 @@ QUICK GUIDE:
 - "How does X look / is it pretty": analyze_webpage_visually (you literally SEE the page).
 - Make art/poster: generate_image → send_whatsapp_image.
 - Show user a website on WhatsApp: screenshot_and_send.
-- Future task: schedule_recurring_task / schedule_one_time_task.""")
+- Future task: schedule_recurring_task / schedule_one_time_task."""
+)
 
 
 # Registry: friendly name → (provider, provider-specific model id)
 MODEL_REGISTRY = {
-    "openai/gpt-oss-120b":      ("groq", "openai/gpt-oss-120b"),
-    "llama-3.3-70b-versatile":  ("groq", "llama-3.3-70b-versatile"),
-    "llama-3.1-8b-instant":     ("groq", "llama-3.1-8b-instant"),
-    "groq/compound":            ("groq", "groq/compound"),
-    "qwen-plus":                ("qwen", "qwen-plus"),
-    "qwen-max":                 ("qwen", "qwen-max"),
-    "qwen-turbo":               ("qwen", "qwen-turbo"),
+    "openai/gpt-oss-120b": ("groq", "openai/gpt-oss-120b"),
+    "llama-3.3-70b-versatile": ("groq", "llama-3.3-70b-versatile"),
+    "llama-3.1-8b-instant": ("groq", "llama-3.1-8b-instant"),
+    "groq/compound": ("groq", "groq/compound"),
+    "qwen-plus": ("qwen", "qwen-plus"),
+    "qwen-max": ("qwen", "qwen-max"),
+    "qwen-turbo": ("qwen", "qwen-turbo"),
 }
 
 DEFAULT_MODEL_CHAIN = [
-    "openai/gpt-oss-120b",      # primary
-    "qwen-plus",                # alibaba — different daily quota, good reasoning
+    "openai/gpt-oss-120b",  # primary
+    "qwen-plus",  # alibaba — different daily quota, good reasoning
     "llama-3.3-70b-versatile",  # backup
-    "llama-3.1-8b-instant",     # cheap fallback
-    "qwen-turbo",               # fast cheap fallback
-    "groq/compound",            # last resort, built-in tools
+    "llama-3.1-8b-instant",  # cheap fallback
+    "qwen-turbo",  # fast cheap fallback
+    "groq/compound",  # last resort, built-in tools
 ]
 
 
@@ -463,7 +505,9 @@ def _build_llm(model_name: str):
         api_key = os.environ.get("DASHSCOPE_API_KEY")
         if not api_key:
             raise RuntimeError("DASHSCOPE_API_KEY is not set.")
-        return ChatOpenAI(model=real_id, api_key=api_key, base_url=_QWEN_BASE_URL, temperature=0.1)
+        return ChatOpenAI(
+            model=real_id, api_key=api_key, base_url=_QWEN_BASE_URL, temperature=0.1
+        )
     raise RuntimeError(f"Unknown provider for model: {model_name}")
 
 
@@ -507,6 +551,17 @@ class XynthRunner:
     On a per-minute rate-limit, waits the recommended time and retries.
     """
 
+    # Conservative free-tier daily token caps (approximate — Groq/DashScope publish these).
+    DAILY_TOKEN_LIMITS = {
+        "openai/gpt-oss-120b":     200_000,
+        "qwen-plus":             1_000_000,
+        "qwen-max":                100_000,
+        "qwen-turbo":            1_000_000,
+        "llama-3.3-70b-versatile": 100_000,
+        "llama-3.1-8b-instant":    500_000,
+        "groq/compound":            70_000,
+    }
+
     def __init__(self, model_names=None):
         self.model_names = model_names or DEFAULT_MODEL_CHAIN
         self.system_prompt = SYSTEM_PROMPT
@@ -519,9 +574,49 @@ class XynthRunner:
             except Exception as e:
                 print(f"  ✗ model failed: {m} ({e})")
         if not self.agents:
-            raise RuntimeError("No Groq models could be initialised.")
+            raise RuntimeError("No models could be initialised.")
         self.current_idx = 0
         self.seen_sessions = set()  # (model_name, session_id) -> seen system prompt?
+        # usage: {YYYY-MM-DD: {model: {"in":int,"out":int,"total":int}}}
+        self.usage = {}
+
+    # ---- Usage tracking ----
+    def _today(self):
+        return datetime.datetime.utcnow().strftime("%Y-%m-%d")
+
+    def _record_usage(self, model: str, in_tok: int, out_tok: int):
+        d = self.usage.setdefault(self._today(), {})
+        slot = d.setdefault(model, {"in": 0, "out": 0, "total": 0})
+        slot["in"] += int(in_tok or 0)
+        slot["out"] += int(out_tok or 0)
+        slot["total"] += int((in_tok or 0) + (out_tok or 0))
+
+    def usage_summary(self):
+        today = self.usage.get(self._today(), {})
+        out = []
+        for m, _ in self.agents:
+            used = today.get(m, {}).get("total", 0)
+            limit = self.DAILY_TOKEN_LIMITS.get(m, 0)
+            out.append({
+                "model": m,
+                "used": used,
+                "limit": limit,
+                "left": max(0, limit - used) if limit else None,
+                "pct": round((used / limit) * 100, 1) if limit else 0,
+            })
+        return {"date_utc": self._today(), "active": self.current_model, "models": out}
+
+    @staticmethod
+    def _extract_token_usage(msg):
+        """Return (input_tokens, output_tokens) from a LangChain AIMessage, if present."""
+        meta = getattr(msg, "usage_metadata", None) or {}
+        if meta:
+            return int(meta.get("input_tokens", 0)), int(meta.get("output_tokens", 0))
+        rm = getattr(msg, "response_metadata", {}) or {}
+        tu = rm.get("token_usage", {}) if isinstance(rm, dict) else {}
+        if tu:
+            return int(tu.get("prompt_tokens", 0)), int(tu.get("completion_tokens", 0))
+        return 0, 0
 
     @property
     def current_model(self) -> str:
@@ -532,11 +627,105 @@ class XynthRunner:
         return self.agents[self.current_idx][1]
 
     def _invoke(self, agent, messages, thread_id):
-        config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 15}
+        config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 5000}
         final = None
-        for chunk in agent.stream({"messages": messages}, config=config, stream_mode="values"):
+        model = self.current_model
+        for chunk in agent.stream(
+            {"messages": messages}, config=config, stream_mode="values"
+        ):
             final = chunk
-        return final["messages"][-1].content if final else "(no response)"
+        if not final:
+            return "(no response)"
+        # Record token usage from the last AI message
+        for m in reversed(final["messages"]):
+            if m.__class__.__name__ == "AIMessage":
+                in_t, out_t = self._extract_token_usage(m)
+                if in_t or out_t:
+                    self._record_usage(model, in_t, out_t)
+                break
+        return final["messages"][-1].content
+
+    def stream_run(self, session_id: str, message: str):
+        """Generator that yields event dicts for SSE-style streaming.
+        Event types:
+          {"type":"status","stage":"start","model":<name>}
+          {"type":"tool_start","name":<tool>,"args":<dict>}
+          {"type":"tool_end","name":<tool>,"result":<short str>,"image_url":<optional>}
+          {"type":"text","content":<str>}        # the final answer text
+          {"type":"image","url":<str>}           # generated image to render inline
+          {"type":"usage","input":int,"output":int,"model":<name>}
+          {"type":"done"}
+          {"type":"error","message":<str>}
+        Falls back to non-streaming run() on hard failures.
+        """
+        agent = self.current_agent
+        model = self.current_model
+        key = (model, session_id)
+        is_first = key not in self.seen_sessions
+        self.seen_sessions.add(key)
+        msgs = (
+            [self.system_prompt, HumanMessage(content=message)]
+            if is_first
+            else [HumanMessage(content=message)]
+        )
+        config = {"configurable": {"thread_id": session_id}, "recursion_limit": 5000}
+        yield {"type": "status", "stage": "start", "model": model}
+
+        # Track pending tool calls so we can match results
+        pending_tool_calls = {}  # tool_call_id -> name
+        final_text = ""
+        try:
+            for update in agent.stream({"messages": msgs}, config=config, stream_mode="updates"):
+                # update is like {"agent": {"messages": [AIMessage]}} or {"tools": {"messages": [ToolMessage]}}
+                for node, payload in update.items():
+                    new_msgs = payload.get("messages", []) if isinstance(payload, dict) else []
+                    for m in new_msgs:
+                        cls = m.__class__.__name__
+                        if cls == "AIMessage":
+                            tool_calls = getattr(m, "tool_calls", None) or []
+                            if tool_calls:
+                                for tc in tool_calls:
+                                    name = tc.get("name", "tool")
+                                    args = tc.get("args", {})
+                                    tcid = tc.get("id", "")
+                                    pending_tool_calls[tcid] = name
+                                    yield {"type": "tool_start", "name": name, "args": args}
+                            else:
+                                # Final answer chunk
+                                content = m.content or ""
+                                if content:
+                                    final_text = content
+                                    yield {"type": "text", "content": content}
+                                in_t, out_t = self._extract_token_usage(m)
+                                if in_t or out_t:
+                                    self._record_usage(model, in_t, out_t)
+                                    yield {"type": "usage", "input": in_t, "output": out_t, "model": model}
+                        elif cls == "ToolMessage":
+                            name = getattr(m, "name", None) or pending_tool_calls.get(getattr(m, "tool_call_id", ""), "tool")
+                            result = (m.content or "")
+                            short = result if len(result) < 240 else result[:237] + "…"
+                            evt = {"type": "tool_end", "name": name, "result": short}
+                            # Inline-image hook: when generate_image returns a URL, surface it.
+                            if name == "generate_image" and result.startswith("http"):
+                                evt["image_url"] = result.strip()
+                                yield evt
+                                yield {"type": "image", "url": result.strip()}
+                            else:
+                                yield evt
+            yield {"type": "done"}
+        except Exception as e:
+            err = str(e)
+            low = err.lower()
+            if ("rate_limit" in low or "429" in err) and ("per day" in low or "tpd" in low):
+                if self.current_idx + 1 < len(self.agents):
+                    old = model
+                    self.current_idx += 1
+                    yield {"type": "status", "stage": "fallback", "from": old, "to": self.current_model}
+                    # Recurse on the new model
+                    yield from self.stream_run(session_id, message)
+                    return
+            yield {"type": "error", "message": err}
+            yield {"type": "done"}
 
     def run(self, session_id: str, message: str) -> str:
         max_attempts = len(self.agents) * 2 + 1
@@ -550,7 +739,11 @@ class XynthRunner:
             key = (model, session_id)
             is_first = key not in self.seen_sessions
             self.seen_sessions.add(key)
-            msgs = [self.system_prompt, HumanMessage(content=current_message)] if is_first else [HumanMessage(content=current_message)]
+            msgs = (
+                [self.system_prompt, HumanMessage(content=current_message)]
+                if is_first
+                else [HumanMessage(content=current_message)]
+            )
             try:
                 return self._invoke(agent, msgs, session_id)
             except Exception as e:
@@ -558,14 +751,20 @@ class XynthRunner:
                 last_err = err
                 low = err.lower()
                 # Daily quota on this model — switch to next model entirely.
-                if ("rate_limit" in low or "429" in err) and ("per day" in low or "tpd" in low):
+                if ("rate_limit" in low or "429" in err) and (
+                    "per day" in low or "tpd" in low
+                ):
                     if self.current_idx + 1 < len(self.agents):
                         old = model
                         self.current_idx += 1
-                        print(f"📉 {old} hit daily limit. Switching to {self.current_model}.")
+                        print(
+                            f"📉 {old} hit daily limit. Switching to {self.current_model}."
+                        )
                         continue
-                    return ("⚠️ All my brains are tired today 😅 — every model has hit its daily token limit. "
-                            "Try again later, or upgrade Groq to the Dev Tier for much higher limits.")
+                    return (
+                        "⚠️ All my brains are tired today 😅 — every model has hit its daily token limit. "
+                        "Try again later, or upgrade Groq to the Dev Tier for much higher limits."
+                    )
                 # Per-minute quota — wait and retry on the same model.
                 if "rate_limit" in low or "429" in err:
                     wait = _parse_retry_after(err)
@@ -574,8 +773,11 @@ class XynthRunner:
                     continue
                 # Tool-call loop or recursion — tighten the hint and retry once.
                 if "tool_use_failed" in err or "GraphRecursionError" in err:
-                    current_message = (message + "\n\n(Reminder: use the minimum number of tool calls. "
-                                                 "Pick ONE tool per need. Stop and answer once you have enough info.)")
+                    current_message = (
+                        message
+                        + "\n\n(Reminder: use the minimum number of tool calls. "
+                        "Pick ONE tool per need. Stop and answer once you have enough info.)"
+                    )
                     continue
                 return f"❌ Error: {err}"
         return f"❌ Could not produce a reply after {attempts} attempts. Last error: {last_err}"

@@ -4,6 +4,7 @@
 - GET  /health
 """
 import os
+import json
 import datetime
 import threading
 import traceback
@@ -85,6 +86,38 @@ def chat():
         return jsonify({"response": "(empty message)"}), 400
     augmented = _augment_with_context(None, message)
     return jsonify({"response": _run_agent(session_id, augmented)})
+
+
+@app.route("/chat/stream", methods=["GET"])
+def chat_stream():
+    """Server-Sent Events stream of the agent's progress for the web UI."""
+    session_id = str(request.args.get("session_id", "default"))
+    message = (request.args.get("message") or "").strip()
+    if not message:
+        return Response("data: {\"type\":\"error\",\"message\":\"empty\"}\n\n", mimetype="text/event-stream")
+    augmented = _augment_with_context(None, message)
+
+    def generate():
+        try:
+            for evt in runner.stream_run(session_id, augmented):
+                yield f"data: {json.dumps(evt)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type':'error','message':str(e)})}\n\n"
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    }
+    return Response(generate(), headers=headers)
+
+
+@app.route("/usage", methods=["GET"])
+def usage_endpoint():
+    """Return today's per-model token usage and remaining budget."""
+    return jsonify(runner.usage_summary())
 
 
 def _send_whatsapp(to_number: str, text: str):
