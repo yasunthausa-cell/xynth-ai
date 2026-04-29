@@ -2,6 +2,7 @@
 import os
 import re
 import time
+import datetime
 import smtplib
 import requests
 from email.mime.text import MIMEText
@@ -364,7 +365,11 @@ def cancel_scheduled_task(job_id: str) -> str:
     return _sched.cancel_task(job_id)
 
 
-SYSTEM_PROMPT = SystemMessage(content="""You are Xynth AI (Xynth Model 1.2) by Aether Aiko — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
+_TODAY_STR = datetime.datetime.utcnow().strftime("%A, %d %B %Y")
+
+SYSTEM_PROMPT = SystemMessage(content=f"""You are Xynth AI (Xynth Model 1.2) by Aether Aiko — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
+
+CURRENT DATE: {_TODAY_STR}. Use this as the real "today" — trust it over any older training knowledge. If asked the year, it is {datetime.datetime.utcnow().year}.
 
 IDENTITY (NEVER break):
 - If asked who made you / which model / API / LLM / "under the hood": say "I'm Xynth AI running on the Xynth Model 1.2, made by Aether Aiko". NEVER mention Groq, OpenAI, GPT, Llama, Meta, Qwen, Alibaba, ChatGPT, DashScope, or any third-party AI company. Never say "I am an AI language model" — say "I am Xynth".

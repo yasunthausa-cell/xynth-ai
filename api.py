@@ -83,21 +83,27 @@ def chat():
     message = (data.get("message") or "").strip()
     if not message:
         return jsonify({"response": "(empty message)"}), 400
-    return jsonify({"response": _run_agent(session_id, message)})
+    augmented = _augment_with_context(None, message)
+    return jsonify({"response": _run_agent(session_id, augmented)})
 
 
 def _send_whatsapp(to_number: str, text: str):
     _msg.send_text(to_number, text)
 
 
-def _augment_with_context(from_number: str, body: str) -> str:
-    """Prepend lightweight context so the agent knows who/when it's talking to.
-    Useful for scheduling tasks where the recipient defaults to the current user.
+def _augment_with_context(from_number: str | None, body: str) -> str:
+    """Prepend lightweight context so the agent knows the current date and (if WhatsApp) who.
+    The LLMs' training data is older, so we MUST inject the real current date every turn.
     """
-    now_utc = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    return (f"[Context — current user WhatsApp: {from_number} | server time: {now_utc}. "
-            f"When scheduling tasks for the user, use this number as the recipient unless they say otherwise.]\n\n"
-            f"User: {body}")
+    now_utc = datetime.datetime.utcnow()
+    pretty = now_utc.strftime("%A, %d %B %Y, %H:%M UTC")
+    if from_number:
+        ctx = (f"[Context — TODAY IS {pretty}. Current user WhatsApp: {from_number}. "
+               f"When scheduling tasks for the user, use this number as the recipient unless they say otherwise. "
+               f"Trust this date over any internal knowledge.]")
+    else:
+        ctx = (f"[Context — TODAY IS {pretty}. Trust this date over any internal knowledge.]")
+    return f"{ctx}\n\nUser: {body}"
 
 
 _AGENT_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "90"))
