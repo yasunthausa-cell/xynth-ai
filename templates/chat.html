@@ -411,6 +411,8 @@
         word-wrap: break-word;
         font-size: 14.5px;
         line-height: 1.6;
+        overflow-x: auto;
+        max-width: 100%;
       }
       .msg.user .bubble {
         background: var(--user-bubble);
@@ -472,6 +474,23 @@
         padding-left: 10px;
         color: var(--muted);
         margin: 8px 0;
+      }
+      .bubble table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        white-space: nowrap;
+      }
+      .bubble th,
+      .bubble td {
+        border: 1px solid var(--line-2);
+        padding: 8px 12px;
+        text-align: left;
+      }
+      .bubble th {
+        background: rgba(0, 0, 0, 0.2);
+        font-weight: 600;
+        color: var(--accent-2);
       }
 
       /* Tool indicators */
@@ -742,18 +761,26 @@
       @media (max-width: 780px) {
         .app {
           grid-template-columns: 1fr;
+          overflow: hidden;
         }
         .sidebar {
           display: none;
         }
+        .msg {
+          padding: 0 16px;
+        }
         .bubble-wrap {
-          max-width: 88%;
+          max-width: calc(100% - 44px); /* Account for 32px avatar + 12px gap */
+          min-width: 0;
         }
         .empty h2 {
           font-size: 24px;
         }
         .suggest {
           grid-template-columns: 1fr;
+        }
+        .composer {
+          padding: 10px 16px 14px;
         }
       }
     </style>
