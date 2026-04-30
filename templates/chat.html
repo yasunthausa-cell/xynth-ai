@@ -782,11 +782,41 @@
           padding: 10px 16px 14px;
         }
       }
+      
+      .profile-btn {
+        position: absolute;
+        top: 20px;
+        right: 24px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: var(--text);
+        transition: 0.15s;
+        z-index: 100;
+      }
+      .profile-btn:hover {
+        background: var(--line);
+      }
+      .profile-btn svg {
+        width: 20px;
+        height: 20px;
+      }
     </style>
   </head>
   <body>
     <div class="app">
       <main class="main">
+        <button class="profile-btn" title="Account Profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        </button>
         <div class="messages" id="messages">
           <div class="empty" id="empty">
             <h2>What can I do for you today?</h2>
