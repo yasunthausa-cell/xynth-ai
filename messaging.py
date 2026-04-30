@@ -30,13 +30,18 @@ def chunk_text(text: str, limit: int = 1500):
         chunks.append(text)
     return chunks
 
-def send_text(to_number: str, text: str) -> bool:
-    if not configured():
-        print("⚠️  Meta WhatsApp API not configured.")
+def send_text(to_number: str, text: str, phone_number_id: str = "") -> bool:
+    if not META_WA_ACCESS_TOKEN:
+        print("⚠️  Meta WhatsApp API not configured (missing token).")
         return False
     
+    sender_id = phone_number_id or META_WA_PHONE_NUMBER_ID
+    if not sender_id:
+        print("⚠️  No Phone Number ID available.")
+        return False
+
     clean_to = _clean_number(to_number)
-    url = f"https://graph.facebook.com/v18.0/{META_WA_PHONE_NUMBER_ID}/messages"
+    url = f"https://graph.facebook.com/v18.0/{sender_id}/messages"
     headers = {
         "Authorization": f"Bearer {META_WA_ACCESS_TOKEN}",
         "Content-Type": "application/json"
@@ -56,20 +61,25 @@ def send_text(to_number: str, text: str) -> bool:
             r.raise_for_status()
         except Exception as e:
             err_text = getattr(e.response, 'text', '') if hasattr(e, 'response') else str(e)
-            print(f"Failed to send WhatsApp text to {to_number}: {err_text}")
+            print(f"Failed to send WhatsApp text to {to_number} (from {sender_id}): {err_text}")
             ok = False
     return ok
 
-def send_image(to_number: str, image_url: str, caption: str = "") -> bool:
+def send_image(to_number: str, image_url: str, caption: str = "", phone_number_id: str = "") -> bool:
     """Send an image (or other media) via Meta WhatsApp API.
     The image_url MUST be a publicly reachable HTTPS URL.
     """
-    if not configured():
-        print("⚠️  Meta WhatsApp API not configured.")
+    if not META_WA_ACCESS_TOKEN:
+        print("⚠️  Meta WhatsApp API not configured (missing token).")
         return False
     
+    sender_id = phone_number_id or META_WA_PHONE_NUMBER_ID
+    if not sender_id:
+        print("⚠️  No Phone Number ID available.")
+        return False
+
     clean_to = _clean_number(to_number)
-    url = f"https://graph.facebook.com/v18.0/{META_WA_PHONE_NUMBER_ID}/messages"
+    url = f"https://graph.facebook.com/v18.0/{sender_id}/messages"
     headers = {
         "Authorization": f"Bearer {META_WA_ACCESS_TOKEN}",
         "Content-Type": "application/json"
@@ -93,5 +103,5 @@ def send_image(to_number: str, image_url: str, caption: str = "") -> bool:
         return True
     except Exception as e:
         err_text = getattr(e.response, 'text', '') if hasattr(e, 'response') else str(e)
-        print(f"Failed to send WhatsApp image to {to_number}: {err_text}")
+        print(f"Failed to send WhatsApp image to {to_number} (from {sender_id}): {err_text}")
         return False

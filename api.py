@@ -178,8 +178,8 @@ def transcribe():
         return jsonify({"error": str(e)}), 500
 
 
-def _send_whatsapp(to_number: str, text: str):
-    _msg.send_text(to_number, text)
+def _send_whatsapp(to_number: str, text: str, phone_number_id: str = ""):
+    _msg.send_text(to_number, text, phone_number_id=phone_number_id)
 
 
 # ── Long-term memory ──────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ def _save_memory(session_id: str, fact: str):
 
 # ── WhatsApp media download ───────────────────────────────────────────────────
 def _download_wa_media(media_id: str) -> bytes | None:
-    token = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
+    token = os.environ.get("META_WA_ACCESS_TOKEN", "")
     if not token:
         return None
     try:
@@ -243,7 +243,7 @@ def _augment_with_context(from_number: str | None, body: str, session_id: str | 
 _AGENT_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "90"))
 
 
-def _process_whatsapp_async(from_number: str, body: str):
+def _process_whatsapp_async(from_number: str, body: str, phone_number_id: str = ""):
     """Run the agent in a background thread and push the reply when done."""
     session_id = f"wa-{from_number}"
     augmented = _augment_with_context(from_number, body, session_id)
@@ -264,7 +264,7 @@ def _process_whatsapp_async(from_number: str, body: str):
     if not reply:
         reply = "(no response)"
     try:
-        _send_whatsapp(from_number, reply)
+        _send_whatsapp(from_number, reply, phone_number_id=phone_number_id)
         print(f"✅ Reply sent to {from_number} ({len(reply)} chars)")
     except Exception:
         traceback.print_exc()
@@ -293,6 +293,10 @@ def whatsapp_webhook():
         messages = value.get("messages", [])
         if not messages:
             return "OK", 200
+
+        # Extract which phone number ID received this message (the bot's number)
+        # This ensures we reply FROM the same number the user messaged, not the test number
+        phone_number_id = value.get("metadata", {}).get("phone_number_id", "")
 
         message = messages[0]
         from_number = message.get("from", "")
@@ -343,11 +347,11 @@ def whatsapp_webhook():
         else:
             body = f"(User sent a '{msg_type}' message)"
 
-        print(f"💬 WA from {from_number} [{msg_type}]: {body[:80]}")
+        print(f"💬 WA from {from_number} [{msg_type}] via phone_id={phone_number_id}: {body[:80]}")
         if body:
             threading.Thread(
                 target=_process_whatsapp_async,
-                args=(from_number, body),
+                args=(from_number, body, phone_number_id),
                 daemon=True,
             ).start()
 
