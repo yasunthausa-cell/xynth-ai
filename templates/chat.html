@@ -311,10 +311,58 @@
         font-variant-numeric: tabular-nums;
       }
 
+      /* === NAVBAR === */
+      .navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        height: 60px;
+        flex-shrink: 0;
+        border-bottom: 1px solid var(--line);
+        background: rgba(248,250,252,0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+      [data-theme="dark"] .navbar {
+        background: rgba(15,17,23,0.85);
+      }
+      .navbar .nav-left, .navbar .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .navbar .brand-name {
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: -0.3px;
+        color: var(--text);
+      }
+      .nav-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        background: transparent;
+        border: none;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: var(--text);
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
+      .nav-btn:hover { background: var(--panel-2); }
+      .nav-btn svg { width: 20px; height: 20px; }
+      .nav-btn.profile { border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line); }
+      .nav-btn.profile:hover { background: var(--line); }
+
       .messages {
         flex: 1;
         overflow-y: scroll;
-        padding: 70px 0 12px;
+        padding: 16px 0 12px;
         min-height: 0;
       }
       .empty {
@@ -884,7 +932,7 @@
         .hint { font-size: 10px; }
         .history-btn { left: 12px; top: 12px; width: 36px; height: 36px; }
         .profile-btn { right: 12px; top: 12px; width: 36px; height: 36px; }
-        .messages { padding: 58px 0 8px; scrollbar-width: none; }
+        .messages { padding: 16px 0 8px; scrollbar-width: none; }
         .messages::-webkit-scrollbar { display: none; }
         .auth-box { width: calc(100% - 40px); padding: 24px 20px; }
         .side-menu { width: 260px; }
@@ -896,25 +944,8 @@
         .suggest div { font-size: 12.5px; }
       }
       
-      .profile-btn {
-        position: absolute;
-        top: 20px;
-        right: 24px;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: var(--panel-2);
-        border: 1px solid var(--line);
-        display: grid;
-        place-items: center;
-        cursor: pointer;
-        color: var(--text);
-        transition: 0.15s;
-        z-index: 100;
-      }
-      .profile-btn:hover { background: var(--line); }
-      .profile-btn svg { width: 20px; height: 20px; }
-      
+      /* Old absolute button styles — replaced by .nav-btn */
+      .profile-btn, .history-btn, .darkmode-btn { display: none !important; }
       .side-menu {
         position: fixed; left: -300px; top: 0; bottom: 0; width: 280px;
         background: var(--panel); border-right: 1px solid var(--line);
@@ -929,16 +960,7 @@
       .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
       .chat-item { padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
       .chat-item:hover { background: var(--panel-2); }
-      
-      .history-btn {
-        position: absolute; top: 20px; left: 24px; width: 40px; height: 40px;
-        border-radius: 8px; background: transparent; border: none;
-        display: grid; place-items: center; cursor: pointer; color: var(--text);
-        z-index: 100; transition: background 0.15s;
-      }
-      .history-btn:hover { background: var(--line); }
-      .history-btn svg { width: 24px; height: 24px; }
-      
+
       .auth-modal {
         position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
         z-index: 1000; display: flex; align-items: center; justify-content: center;
@@ -979,18 +1001,22 @@
     </div>
     <div class="app">
       <main class="main">
-        <button class="history-btn" title="Chat History" id="historyBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
-        <button class="darkmode-btn" id="darkmodeBtn" title="Toggle dark mode">
-          <svg id="darkIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
-        <button class="profile-btn" title="Account Profile" id="profileBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </button>
+        <nav class="navbar">
+          <div class="nav-left">
+            <button class="nav-btn" id="historyBtn" title="Chat History">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <span class="brand-name">Xynth AI</span>
+          </div>
+          <div class="nav-right">
+            <button class="nav-btn" id="darkmodeBtn" title="Toggle dark mode">
+              <svg id="darkIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <button class="nav-btn profile" id="profileBtn" title="Account">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </button>
+          </div>
+        </nav>
         <div class="messages" id="messages">
           <div class="empty" id="empty">
             <h2 id="greetingText">What can I do for you today?</h2>
@@ -1514,7 +1540,7 @@
         inputEl.style.height = "auto";
         inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
       });
-      sendBtn.addEventListener("click", send);
+      sendBtn.addEventListener("click", () => send());
 
       // === Voice input (mic button) ===
       const micBtn = $("#mic");
