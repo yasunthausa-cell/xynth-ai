@@ -244,14 +244,8 @@ _AGENT_TIMEOUT_SECONDS = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "90"))
 
 
 def _process_whatsapp_async(from_number: str, body: str):
-    """Run the agent in a background thread. Sends instant ACK first, then full reply."""
+    """Run the agent in a background thread and push the reply when done."""
     session_id = f"wa-{from_number}"
-
-    # Instant acknowledgement so user knows bot received the message
-    acks = ["⏳ On it! Give me a moment…", "🔍 Let me look into that…",
-            "🧠 Thinking… back in a sec!", "⚡ Working on your request…"]
-    _send_whatsapp(from_number, random.choice(acks))
-
     augmented = _augment_with_context(from_number, body, session_id)
     reply = None
     try:
