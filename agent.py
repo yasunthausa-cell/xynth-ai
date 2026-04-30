@@ -399,10 +399,10 @@ def generate_image(prompt: str, width: int = 1024, height: int = 1024) -> str:
 
 @tool
 def send_whatsapp_image(recipient: str, image_url: str, caption: str = "") -> str:
-    """Send an image to a WhatsApp recipient via Twilio. The image_url must be a publicly accessible HTTPS URL (jpg/png/gif/webp). Use this to deliver images you generated, screenshots you took, or images you found online.
+    """Send an image to a WhatsApp recipient via the Meta Cloud API. The image_url must be a publicly accessible HTTPS URL (jpg/png/gif/webp). Use this to deliver images you generated, screenshots you took, or images you found online.
 
     Args:
-        recipient: WhatsApp number with 'whatsapp:' prefix (e.g. 'whatsapp:+14155551234'). Use the current user's number unless told otherwise.
+        recipient: WhatsApp phone number WITHOUT the 'whatsapp:' prefix, just digits e.g. '94771234567'. Use the current user's number unless told otherwise.
         image_url: Public HTTPS URL of the image.
         caption: Optional caption text to accompany the image.
     """
@@ -410,7 +410,7 @@ def send_whatsapp_image(recipient: str, image_url: str, caption: str = "") -> st
     return (
         "✅ Image sent."
         if ok
-        else "❌ Failed to send image (check Twilio config and that the URL is public HTTPS)."
+        else "❌ Failed to send image (check META_WA_ACCESS_TOKEN and that the URL is public HTTPS)."
     )
 
 
@@ -421,12 +421,12 @@ def screenshot_and_send(
     """Take a screenshot of a webpage and send it to the user on WhatsApp. Use when the user asks "show me what X looks like" or wants a visual of a website.
 
     Args:
-        recipient: WhatsApp number with 'whatsapp:' prefix.
+        recipient: WhatsApp phone number, digits only e.g. '94771234567'. Use the current user's number.
         url: The webpage to screenshot.
         caption: Optional caption text.
         full_page: If True capture the full scrollable page. Default False (viewport only).
     """
-    import os, time, uuid
+    import time, uuid
 
     try:
         page = _ensure_browser()
@@ -440,15 +440,24 @@ def screenshot_and_send(
         path = os.path.join(static_dir, filename)
         page.screenshot(path=path, full_page=full_page)
 
-        host = os.environ.get("REPLIT_DEV_DOMAIN")
+        # Support Railway, Render, Replit or any custom domain
+        host = (
+            os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+            or os.environ.get("RENDER_EXTERNAL_URL", "").replace("https://", "")
+            or os.environ.get("REPLIT_DEV_DOMAIN")
+            or os.environ.get("PUBLIC_HOST")
+        )
         if not host:
-            return f"Screenshot saved to {path}, but REPLIT_DEV_DOMAIN is not set so I cannot send it."
+            return (
+                f"Screenshot saved locally to {path}, but no public domain env var is set "
+                f"(set RAILWAY_PUBLIC_DOMAIN or PUBLIC_HOST). Cannot send via WhatsApp."
+            )
         public_url = f"https://{host}/media/{filename}"
         ok = _msg.send_image(recipient, public_url, caption)
         return (
-            f"✅ Screenshot of {url} sent."
+            f"✅ Screenshot of {url} sent to {recipient}."
             if ok
-            else f"❌ Failed to send screenshot. Public URL was {public_url}."
+            else f"❌ Failed to send screenshot. Public URL was: {public_url}"
         )
     except Exception as e:
         return f"Failed to screenshot {url}: {str(e)}"
