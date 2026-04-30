@@ -1001,6 +1001,8 @@ class XynthRunner:
         self.thread_mapping = {}
         # usage: {YYYY-MM-DD: {model: {"in":int,"out":int,"total":int}}}
         self.usage = {}
+        # Limit user messages per day: {session_id: {"date": "YYYY-MM-DD", "count": int}}
+        self.daily_message_counts = {}
 
     # ---- Usage tracking ----
     def _today(self):
@@ -1068,18 +1070,20 @@ class XynthRunner:
         return final["messages"][-1].content
 
     def stream_run(self, session_id: str, message: str):
-        """Generator that yields event dicts for SSE-style streaming.
-        Event types:
-          {"type":"status","stage":"start","model":<name>}
-          {"type":"tool_start","name":<tool>,"args":<dict>}
-          {"type":"tool_end","name":<tool>,"result":<short str>,"image_url":<optional>}
-          {"type":"text","content":<str>}        # the final answer text
-          {"type":"image","url":<str>}           # generated image to render inline
-          {"type":"usage","input":int,"output":int,"model":<name>}
-          {"type":"done"}
-          {"type":"error","message":<str>}
-        Falls back to non-streaming run() on hard failures.
-        """
+        """Generator that yields event dicts for SSE-style streaming."""
+        today = self._today()
+        user_usage = self.daily_message_counts.setdefault(session_id, {"date": today, "count": 0})
+        if user_usage["date"] != today:
+            user_usage["date"] = today
+            user_usage["count"] = 0
+            
+        if user_usage["count"] >= 20:
+            yield {"type": "text", "content": "🥱 *Xynth is tired!* You have reached the limit of 20 messages per day. Please come back in 24 hours to chat more!"}
+            yield {"type": "done"}
+            return
+            
+        user_usage["count"] += 1
+
         agent = self.current_agent
         model = self.current_model
         mapped_session = self.thread_mapping.get(session_id, session_id)
@@ -1140,12 +1144,10 @@ class XynthRunner:
         except Exception as e:
             err = str(e)
             low = err.lower()
-            if ("rate_limit" in low or "429" in err) and ("per day" in low or "tpd" in low):
+            if any(k in low for k in ["rate_limit", "429", "quota", "credit", "insufficient", "balance", "exhausted"]):
                 if self.current_idx + 1 < len(self.agents):
-                    old = model
                     self.current_idx += 1
-                    yield {"type": "status", "stage": "fallback", "from": old, "to": self.current_model}
-                    # Recurse on the new model
+                    # Note: We do NOT yield a fallback status so it's invisible to the user
                     yield from self.stream_run(session_id, message)
                     return
             if "invalid_chat_history" in low or "do not have a corresponding toolmessage" in low:
@@ -1157,6 +1159,17 @@ class XynthRunner:
             yield {"type": "done"}
 
     def run(self, session_id: str, message: str) -> str:
+        today = self._today()
+        user_usage = self.daily_message_counts.setdefault(session_id, {"date": today, "count": 0})
+        if user_usage["date"] != today:
+            user_usage["date"] = today
+            user_usage["count"] = 0
+            
+        if user_usage["count"] >= 20:
+            return "🥱 *Xynth is tired!* You have reached the limit of 20 messages per day. Please come back in 24 hours to chat more!"
+            
+        user_usage["count"] += 1
+        
         max_attempts = len(self.agents) * 2 + 1
         attempts = 0
         last_err = None
@@ -1180,20 +1193,15 @@ class XynthRunner:
                 err = str(e)
                 last_err = err
                 low = err.lower()
-                # Daily quota on this model — switch to next model entirely.
-                if ("rate_limit" in low or "429" in err) and (
-                    "per day" in low or "tpd" in low
-                ):
+                # Quota exhausted or rate limited — switch to next model silently.
+                if any(k in low for k in ["rate_limit", "429", "quota", "credit", "insufficient", "balance", "exhausted"]):
                     if self.current_idx + 1 < len(self.agents):
-                        old = model
                         self.current_idx += 1
-                        print(
-                            f"📉 {old} hit daily limit. Switching to {self.current_model}."
-                        )
+                        print(f"📉 {model} exhausted. Silently switching to {self.current_model}.")
                         continue
                     return (
                         "⚠️ All my brains are tired today 😅 — every model has hit its daily token limit. "
-                        "Try again later, or upgrade Groq to the Dev Tier for much higher limits."
+                        "Try again later."
                     )
                 # Per-minute quota — wait and retry on the same model.
                 if "rate_limit" in low or "429" in err:
