@@ -503,6 +503,250 @@ def cancel_scheduled_task(job_id: str) -> str:
     return _sched.cancel_task(job_id)
 
 
+@tool
+def remember_user_fact(session_id: str, fact: str) -> str:
+    """Save an important fact about the user to long-term memory so you remember it in future conversations.
+    Use this whenever the user shares personal preferences, their name, location, job, or anything they'd want remembered.
+
+    Args:
+        session_id: The current session/conversation ID. This is provided in the system context.
+        fact: A concise statement about the user, e.g. 'User's name is Yasun', 'User prefers metric units', 'User lives in Colombo'.
+    """
+    try:
+        import os, requests as _rq
+        base = os.environ.get("SELF_BASE_URL", "http://localhost:5000")
+        r = _rq.post(f"{base}/memory", json={"session_id": session_id, "fact": fact}, timeout=5)
+        if r.ok:
+            return f"✅ Remembered: {fact}"
+        return f"⚠️ Could not save memory: {r.text}"
+    except Exception as e:
+        return f"⚠️ Memory save failed: {e}"
+
+
+@tool
+def get_weather(location: str) -> str:
+    """Get the current weather and today's forecast for any city or location.
+
+    Args:
+        location: City name or location, e.g. 'Colombo', 'London', 'New York'.
+    """
+    try:
+        import urllib.parse
+        loc_encoded = urllib.parse.quote(location)
+        # Open-Meteo: free, no API key needed — geocode first
+        geo = requests.get(
+            f"https://geocoding-api.open-meteo.com/v1/search?name={loc_encoded}&count=1&format=json",
+            timeout=10
+        ).json()
+        results = geo.get("results")
+        if not results:
+            return f"Could not find location: {location}"
+        r = results[0]
+        lat, lon, name, country = r["latitude"], r["longitude"], r["name"], r.get("country", "")
+        wx = requests.get(
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            f"&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,apparent_temperature"
+            f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=1",
+            timeout=10
+        ).json()
+        cur = wx.get("current", {})
+        daily = wx.get("daily", {})
+        temp = cur.get("temperature_2m", "?")
+        feels = cur.get("apparent_temperature", "?")
+        humidity = cur.get("relative_humidity_2m", "?")
+        wind = cur.get("wind_speed_10m", "?")
+        high = (daily.get("temperature_2m_max") or [None])[0]
+        low = (daily.get("temperature_2m_min") or [None])[0]
+        rain = (daily.get("precipitation_sum") or [None])[0]
+        units = wx.get("current_units", {})
+        t_unit = units.get("temperature_2m", "°C")
+        return (
+            f"Weather in {name}, {country}:\n"
+            f"🌡️ {temp}{t_unit} (feels like {feels}{t_unit})\n"
+            f"💧 Humidity: {humidity}%  💨 Wind: {wind} km/h\n"
+            f"📊 Today: High {high}{t_unit} / Low {low}{t_unit}\n"
+            f"🌧️ Precipitation: {rain} mm"
+        )
+    except Exception as e:
+        return f"Weather lookup failed: {e}"
+
+
+@tool
+def get_price(asset: str) -> str:
+    """Get the live price of a cryptocurrency (BTC, ETH, etc.) or a US stock ticker (AAPL, TSLA, etc.).
+
+    Args:
+        asset: Ticker symbol or name, e.g. 'BTC', 'bitcoin', 'AAPL', 'TSLA', 'ETH'.
+    """
+    try:
+        a = asset.strip().upper()
+        # Try crypto first via CoinGecko (free, no key)
+        crypto_ids = {"BTC": "bitcoin", "ETH": "ethereum", "BNB": "binancecoin",
+                      "SOL": "solana", "XRP": "ripple", "DOGE": "dogecoin",
+                      "ADA": "cardano", "AVAX": "avalanche-2", "DOT": "polkadot"}
+        cg_id = crypto_ids.get(a, a.lower())
+        cg = requests.get(
+            f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd&include_24hr_change=true",
+            timeout=8
+        ).json()
+        if cg_id in cg:
+            price = cg[cg_id]["usd"]
+            change = cg[cg_id].get("usd_24h_change", 0)
+            arrow = "📈" if change >= 0 else "📉"
+            return f"{arrow} {a}: ${price:,.2f} USD ({change:+.2f}% 24h)"
+        # Fall back to Yahoo Finance for stocks
+        yf = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{a}?interval=1d&range=1d",
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=8
+        ).json()
+        meta = yf["chart"]["result"][0]["meta"]
+        price = meta.get("regularMarketPrice") or meta.get("previousClose")
+        prev = meta.get("previousClose", price)
+        change_pct = ((price - prev) / prev * 100) if prev else 0
+        currency = meta.get("currency", "USD")
+        arrow = "📈" if change_pct >= 0 else "📉"
+        return f"{arrow} {a}: {price:,.2f} {currency} ({change_pct:+.2f}% today)"
+    except Exception as e:
+        return f"Price lookup failed for '{asset}': {e}"
+
+
+@tool
+def summarize_youtube(url: str) -> str:
+    """Fetch and summarize a YouTube video by extracting its transcript/subtitles.
+
+    Args:
+        url: Full YouTube video URL, e.g. 'https://www.youtube.com/watch?v=abc123'
+    """
+    try:
+        import re
+        # Extract video ID
+        match = re.search(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})", url)
+        if not match:
+            return "Could not extract video ID from URL."
+        vid_id = match.group(1)
+        # Try youtube-transcript-api if available
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            transcript_list = YouTubeTranscriptApi.get_transcript(vid_id)
+            text = " ".join(t["text"] for t in transcript_list)[:6000]
+            return f"[YouTube transcript for {url}]\n\n{text}\n\n(Summarize the above transcript in a clear, structured way.)"
+        except Exception:
+            pass
+        # Fallback: scrape the page for description/title
+        page = requests.get(
+            f"https://www.youtube.com/watch?v={vid_id}",
+            headers=_DEFAULT_HEADERS, timeout=12
+        ).text
+        soup = BeautifulSoup(page, "html.parser")
+        title = soup.find("title")
+        title_text = title.get_text() if title else "Unknown title"
+        # Extract description from og:description
+        desc = soup.find("meta", attrs={"name": "description"})
+        desc_text = desc["content"] if desc else "No description found."
+        return (
+            f"Could not fetch transcript directly. Here's what I know from the page:\n"
+            f"Title: {title_text}\nDescription: {desc_text}\n\n"
+            f"Try installing youtube-transcript-api for full transcripts: pip install youtube-transcript-api"
+        )
+    except Exception as e:
+        return f"YouTube summarization failed: {e}"
+
+
+@tool
+def translate_text(text: str, target_language: str, source_language: str = "auto") -> str:
+    """Translate text from one language to another using a free translation API.
+
+    Args:
+        text: The text to translate.
+        target_language: Target language code or name, e.g. 'es', 'fr', 'Sinhala', 'Japanese', 'Arabic'.
+        source_language: Source language code or 'auto' for automatic detection. Default 'auto'.
+    """
+    try:
+        import urllib.parse
+        # Use MyMemory free API (no key required, 5000 chars/day)
+        params = {
+            "q": text[:500],
+            "langpair": f"{source_language}|{target_language}",
+        }
+        r = requests.get(
+            "https://api.mymemory.translated.net/get",
+            params=params, timeout=10
+        ).json()
+        translated = r.get("responseData", {}).get("translatedText", "")
+        if translated and translated != text:
+            return f"Translation ({source_language} → {target_language}):\n{translated}"
+        return f"Translation failed or no change detected. Raw response: {r.get('responseStatus', '')}"
+    except Exception as e:
+        return f"Translation failed: {e}"
+
+
+@tool
+def generate_qr_code(content: str, label: str = "") -> str:
+    """Generate a QR code image for any URL, text, phone number, or WiFi credentials.
+    Returns a public URL to the QR code image that can be shared.
+
+    Args:
+        content: What to encode — URL, plain text, phone number, WiFi credentials, etc.
+        label: Optional label/caption to show below the QR code.
+    """
+    try:
+        import urllib.parse
+        encoded = urllib.parse.quote(content)
+        label_param = f"&label={urllib.parse.quote(label)}" if label else ""
+        url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded}{label_param}"
+        return url
+    except Exception as e:
+        return f"QR code generation failed: {e}"
+
+
+@tool
+def calculate(expression: str) -> str:
+    """Evaluate a mathematical expression reliably. Use for arithmetic, percentages, conversions, and formulas.
+    Supports: +, -, *, /, **, sqrt(), sin(), cos(), log(), abs(), round(), etc.
+
+    Args:
+        expression: A valid Python math expression, e.g. '2**32', 'sqrt(144)', '15 * 1.18', '(100 * 0.07) / 12'.
+    """
+    import math
+    allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("_")}
+    allowed_names.update({"abs": abs, "round": round, "int": int, "float": float})
+    try:
+        result = eval(expression, {"__builtins__": {}}, allowed_names)  # noqa: S307
+        return f"Result: {result}"
+    except Exception as e:
+        return f"Calculation error for '{expression}': {e}"
+
+
+@tool
+def read_pdf_url(url: str) -> str:
+    """Download and extract text content from a PDF file at a given URL.
+
+    Args:
+        url: Public HTTPS URL pointing to a PDF file.
+    """
+    try:
+        import io
+        response = requests.get(url, headers=_DEFAULT_HEADERS, timeout=20)
+        response.raise_for_status()
+        # Try PyPDF2 first, fallback to pdfminer
+        try:
+            import PyPDF2
+            reader = PyPDF2.PdfReader(io.BytesIO(response.content))
+            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        except ImportError:
+            try:
+                from pdfminer.high_level import extract_text_to_fp
+                from pdfminer.layout import LAParams
+                output = io.StringIO()
+                extract_text_to_fp(io.BytesIO(response.content), output, laparams=LAParams())
+                text = output.getvalue()
+            except ImportError:
+                return "PDF reading requires PyPDF2 or pdfminer.six. Install with: pip install PyPDF2"
+        return text[:5000] if text.strip() else "(PDF contained no extractable text)"
+    except Exception as e:
+        return f"PDF reading failed: {e}"
+
+
 _TODAY_STR = datetime.datetime.utcnow().strftime("%A, %d %B %Y")
 
 SYSTEM_PROMPT = SystemMessage(
@@ -547,6 +791,14 @@ QUICK GUIDE:
 - Facts/history/large knowledge: wikipedia_search.
 - Local project info or internal docs: query_local_knowledge.
 - Recent news/prices: web_search ONCE → scrape_website ONCE on best URL → answer.
+- Live weather: get_weather(location).
+- Crypto or stock price: get_price(asset).
+- Math/numbers: calculate(expression) — never guess, always compute.
+- Translate text: translate_text(text, target_language).
+- QR code: generate_qr_code(content) → return image URL to user.
+- YouTube summary: summarize_youtube(url).
+- PDF at URL: read_pdf_url(url).
+- Remember user facts: remember_user_fact(session_id, fact) — whenever user shares name, prefs, location, etc.
 - Dynamic / login sites: browser_open → browser_get_html → browser_type/click.
 - "How does X look / is it pretty": analyze_webpage_visually (you literally SEE the page).
 - Make art/poster: generate_image → send_whatsapp_image.
@@ -649,6 +901,14 @@ def _all_tools():
         schedule_one_time_task,
         list_scheduled_tasks,
         cancel_scheduled_task,
+        remember_user_fact,
+        get_weather,
+        get_price,
+        summarize_youtube,
+        translate_text,
+        generate_qr_code,
+        calculate,
+        read_pdf_url,
     ]
 
 

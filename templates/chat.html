@@ -516,6 +516,51 @@
         background: transparent;
         padding: 0;
       }
+
+      /* Code block copy button */
+      .code-block-wrap {
+        position: relative;
+        margin: 8px 0;
+      }
+      .code-block-wrap pre {
+        margin: 0;
+      }
+      .code-copy-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #94a3b8;
+        border-radius: 6px;
+        padding: 3px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: 0.15s;
+        font-family: inherit;
+      }
+      .code-copy-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+      .code-copy-btn.copied { color: #4ade80; border-color: #4ade80; }
+
+      /* Thumbs feedback */
+      .feedback-btns {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+      }
+      .thumb-btn {
+        background: none;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 3px 7px;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--muted);
+        transition: 0.15s;
+      }
+      .thumb-btn:hover { background: var(--panel-2); }
+      .thumb-btn.active-up { color: #4ade80; border-color: #4ade80; }
+      .thumb-btn.active-down { color: #f87171; border-color: #f87171; }
       .bubble a {
         color: var(--accent-2);
         text-decoration: none;
@@ -1156,7 +1201,23 @@
       const modelListEl = $("#modelList"),
         activeModelEl = $("#activeModel");
 
-      marked.setOptions({ breaks: true, gfm: true });
+      // Configure marked with a custom renderer for code copy buttons
+      const markedRenderer = new marked.Renderer();
+      markedRenderer.code = function(code, lang) {
+        const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const langLabel = lang ? `<span style="font-size:10px;opacity:0.5;margin-right:8px;">${lang}</span>` : '';
+        return `<div class="code-block-wrap">
+          <pre><code>${escaped}</code></pre>
+          <button class="code-copy-btn" onclick="(function(btn){
+            const code = btn.parentElement.querySelector('code').innerText;
+            navigator.clipboard.writeText(code).then(()=>{
+              btn.textContent='Copied!'; btn.classList.add('copied');
+              setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); }, 2000);
+            });
+          })(this)">${langLabel}Copy</button>
+        </div>`;
+      };
+      marked.setOptions({ breaks: true, gfm: true, renderer: markedRenderer });
 
       function escapeHtml(s) {
         return s.replace(
