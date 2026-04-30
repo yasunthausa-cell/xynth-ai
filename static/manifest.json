@@ -1,0 +1,22 @@
+{
+  "name": "Xynth AI",
+  "short_name": "Xynth",
+  "description": "Your intelligent AI assistant — browse, create, and explore.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/6366f1/ffffff?text=X",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/512x512/6366f1/ffffff?text=X",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

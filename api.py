@@ -76,6 +76,13 @@ def serve_media(filename):
     return send_from_directory(STATIC_DIR, filename)
 
 
+@app.route("/manifest.json", methods=["GET"])
+def serve_manifest():
+    """Serve the PWA manifest."""
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    return send_from_directory(static_dir, "manifest.json")
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
