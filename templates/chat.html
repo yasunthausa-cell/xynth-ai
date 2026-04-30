@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Xynth AI</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
       :root {
         --bg: #f8fafc;
@@ -799,19 +800,76 @@
         transition: 0.15s;
         z-index: 100;
       }
-      .profile-btn:hover {
-        background: var(--line);
+      .profile-btn:hover { background: var(--line); }
+      .profile-btn svg { width: 20px; height: 20px; }
+      
+      .side-menu {
+        position: fixed; left: -300px; top: 0; bottom: 0; width: 280px;
+        background: var(--panel); border-right: 1px solid var(--line);
+        z-index: 200; transition: left 0.3s ease; display: flex;
+        flex-direction: column; padding: 16px; box-shadow: var(--shadow);
       }
-      .profile-btn svg {
-        width: 20px;
-        height: 20px;
+      .side-menu.open { left: 0; }
+      .side-menu h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+      .side-menu .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); }
+      .side-menu .new-chat { width: 100%; padding: 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); text-align: left; cursor: pointer; font-weight: 500; font-size: 14px; margin-bottom: 16px; }
+      .side-menu .new-chat:hover { background: var(--line); }
+      .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+      .chat-item { padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+      .chat-item:hover { background: var(--panel-2); }
+      
+      .history-btn {
+        position: absolute; top: 20px; left: 24px; width: 40px; height: 40px;
+        border-radius: 8px; background: transparent; border: none;
+        display: grid; place-items: center; cursor: pointer; color: var(--text);
+        z-index: 100; transition: background 0.15s;
       }
+      .history-btn:hover { background: var(--line); }
+      .history-btn svg { width: 24px; height: 24px; }
+      
+      .auth-modal {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+        z-index: 1000; display: flex; align-items: center; justify-content: center;
+      }
+      .auth-modal.hidden { display: none; }
+      .auth-box {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+        padding: 30px; width: 340px; box-shadow: var(--shadow); text-align: center;
+      }
+      .auth-box h2 { margin: 0 0 10px; font-size: 22px; }
+      .auth-box p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+      .auth-box input {
+        width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px;
+        border: 1px solid var(--line); background: var(--bg); color: var(--text); outline: none;
+      }
+      .auth-box input:focus { border-color: var(--accent); }
     </style>
   </head>
   <body>
+    <div class="auth-modal hidden" id="authModal">
+      <div class="auth-box">
+        <h2>Welcome to Xynth AI</h2>
+        <p>Sign in or create an account to save your chats.</p>
+        <input type="email" id="authEmail" placeholder="Email address" />
+        <input type="password" id="authPassword" placeholder="Password" />
+        <button class="btn send" id="authSignIn" style="width: 100%; margin-top: 10px; border: none; color: white;">Sign In</button>
+        <button class="btn" id="authSignUp" style="width: 100%; margin-top: 10px;">Create Account</button>
+        <div id="authError" style="color: #f87171; margin-top: 10px; font-size: 13px;"></div>
+      </div>
+    </div>
+    <div class="side-menu" id="sideMenu">
+      <h3>Chat History <button class="close-btn" id="closeMenu">&times;</button></h3>
+      <button class="new-chat" id="sideNewChat">＋ New Chat</button>
+      <div class="chat-list" id="chatList">
+        <div class="chat-item">Current Session</div>
+      </div>
+    </div>
     <div class="app">
       <main class="main">
-        <button class="profile-btn" title="Account Profile">
+        <button class="history-btn" title="Chat History" id="historyBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <button class="profile-btn" title="Account Profile" id="profileBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
@@ -824,27 +882,8 @@
               I can search the web, read pages, generate images, send emails,
               schedule reminders, and more.
             </p>
-            <div class="suggest">
-              <div
-                data-prompt="Visit stripe.com and tell me what you think of its design."
-              >
-                <span class="icon">🎨</span>Critique a website's design
-              </div>
-              <div
-                data-prompt="Generate an image of a futuristic Colombo skyline at golden hour."
-              >
-                <span class="icon">🖼️</span>Generate an image
-              </div>
-              <div
-                data-prompt="Search the web for today's top tech news and summarise the top 3 stories."
-              >
-                <span class="icon">📰</span>Today's tech news
-              </div>
-              <div
-                data-prompt="What's the current price of GitHub Team plan per user?"
-              >
-                <span class="icon">💰</span>Look up live pricing
-              </div>
+            <div class="suggest" id="suggestContainer">
+              <!-- Randomized suggestions will be injected here by JS -->
             </div>
           </div>
         </div>
@@ -881,12 +920,73 @@
     </div>
 
     <script>
+      const SUPABASE_URL = "https://ujlqigpwoaewdrylesxg.supabase.co";
+      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHFpZ3B3b2Fld2RyeWxlc3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTk4NDcsImV4cCI6MjA5MzA5NTg0N30.zmcXsds_nFWjpPdh9V_RtpMV3HNrR4Dgk9VsuZ8Jd8Y";
+      const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      
+      let currentUser = null;
+      let chatSaved = false;
+
       const sessionId =
         localStorage.getItem("xynth_session") ||
         "web-" + Math.random().toString(36).slice(2, 10);
       localStorage.setItem("xynth_session", sessionId);
 
       const $ = (s) => document.querySelector(s);
+      
+      // Supabase Auth Handling
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (session) {
+          currentUser = session.user;
+          $("#authModal").classList.add("hidden");
+          loadChatHistory();
+        } else {
+          currentUser = null;
+          $("#authModal").classList.remove("hidden");
+        }
+      });
+
+      $("#authSignIn").addEventListener("click", async () => {
+        const email = $("#authEmail").value;
+        const password = $("#authPassword").value;
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) $("#authError").textContent = error.message;
+      });
+
+      $("#authSignUp").addEventListener("click", async () => {
+        const email = $("#authEmail").value;
+        const password = $("#authPassword").value;
+        const { error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) $("#authError").textContent = error.message;
+        else $("#authError").textContent = "Account created! Check email or sign in.";
+      });
+
+      $("#profileBtn").addEventListener("click", async () => {
+        if (confirm("Sign out of your account?")) {
+          await supabaseClient.auth.signOut();
+        }
+      });
+
+      async function loadChatHistory() {
+        if (!currentUser) return;
+        const { data, error } = await supabaseClient.from('chats').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+        if (data) {
+          const chatList = $("#chatList");
+          chatList.innerHTML = "";
+          data.forEach(chat => {
+            const div = document.createElement("div");
+            div.className = "chat-item";
+            div.textContent = chat.title;
+            if (chat.id === sessionId) div.style.background = "var(--panel-2)";
+            div.addEventListener("click", () => {
+              localStorage.setItem("xynth_session", chat.id);
+              location.reload();
+            });
+            chatList.appendChild(div);
+          });
+        }
+      }
+
       const messagesEl = $("#messages"),
         emptyEl = $("#empty");
       const inputEl = $("#input"),
@@ -1034,6 +1134,14 @@
 
         appendUserMessage(text);
         const ui = appendBotMessage();
+        
+        if (!chatSaved && currentUser) {
+          chatSaved = true;
+          const title = text.slice(0, 30) + (text.length > 30 ? "..." : "");
+          supabaseClient.from('chats').insert([{ id: sessionId, user_id: currentUser.id, title: title }])
+            .then(() => loadChatHistory());
+        }
+
         const activeChips = {}; // toolName -> latest chip element pending
         let pendingImagePlaceholder = null;
         let firstTextReceived = false;
@@ -1082,6 +1190,8 @@
             if (!firstTextReceived) {
               ui.bubble.innerHTML = "";
               firstTextReceived = true;
+              const profileBtn = $("#profileBtn");
+              if (profileBtn) profileBtn.style.display = "none";
             }
             ui.bubble.innerHTML = marked.parse(evt.content || "");
             scrollToBottom();
@@ -1243,6 +1353,46 @@
           const id = "web-" + Math.random().toString(36).slice(2, 10);
           localStorage.setItem("xynth_session", id);
           location.reload();
+        });
+      }
+      
+      // Sidebar logic
+      const sideMenu = $("#sideMenu");
+      $("#historyBtn").addEventListener("click", () => sideMenu.classList.add("open"));
+      $("#closeMenu").addEventListener("click", () => sideMenu.classList.remove("open"));
+      $("#sideNewChat").addEventListener("click", () => {
+        const id = "web-" + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem("xynth_session", id);
+        location.reload();
+      });
+
+      // Randomized Suggestions
+      const allSuggestions = [
+        { icon: "🎨", text: "Critique a website's design", prompt: "Visit stripe.com and tell me what you think of its design." },
+        { icon: "🖼️", text: "Generate an image", prompt: "Generate an image of a futuristic Colombo skyline at golden hour." },
+        { icon: "📰", text: "Today's tech news", prompt: "Search the web for today's top tech news and summarise the top 3 stories." },
+        { icon: "💰", text: "Look up live pricing", prompt: "What's the current price of GitHub Team plan per user?" },
+        { icon: "📧", text: "Draft an email", prompt: "Draft a polite email declining a meeting invite due to a busy schedule." },
+        { icon: "🐍", text: "Write Python code", prompt: "Write a python script that fetches the top 5 posts from HackerNews." },
+        { icon: "✈️", text: "Plan a trip", prompt: "Plan a 3-day itinerary for a relaxing trip to Kyoto." },
+        { icon: "🤔", text: "Brainstorm ideas", prompt: "Give me 5 unique ideas for a hackathon project." }
+      ];
+      const suggestEl = $("#suggestContainer");
+      if (suggestEl) {
+        const shuffled = allSuggestions.sort(() => 0.5 - Math.random()).slice(0, 4);
+        suggestEl.innerHTML = "";
+        shuffled.forEach(s => {
+          const div = document.createElement("div");
+          div.innerHTML = `<span class="icon">${s.icon}</span>${escapeHtml(s.text)}`;
+          div.addEventListener("click", () => {
+            inputEl.value = s.prompt;
+            inputEl.dispatchEvent(new Event("input"));
+            inputEl.focus();
+            // Also hide profile btn immediately when suggest clicked
+            const pBtn = $("#profileBtn");
+            if (pBtn) pBtn.style.display = "none";
+          });
+          suggestEl.appendChild(div);
         });
       }
 
