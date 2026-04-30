@@ -809,24 +809,17 @@ QUICK GUIDE:
 
 # Registry: friendly name → (provider, provider-specific model id)
 MODEL_REGISTRY = {
-    "qwen3.5-omni-plus-2026-03-15": ("qwen", "qwen3.5-omni-plus-2026-03-15"),
-    "openai/gpt-oss-120b": ("groq", "openai/gpt-oss-120b"),
-    "llama-3.3-70b-versatile": ("groq", "llama-3.3-70b-versatile"),
-    "llama-3.1-8b-instant": ("groq", "llama-3.1-8b-instant"),
-    "groq/compound": ("groq", "groq/compound"),
-    "qwen-plus": ("qwen", "qwen-plus"),
-    "qwen-max": ("qwen", "qwen-max"),
-    "qwen-turbo": ("qwen", "qwen-turbo"),
+    "Xynth 1.5": ("qwen", "qwen3.5-omni-plus-2026-03-15"),
+    "Xynth 1.5 (Fallback)": ("groq", "llama-3.3-70b-versatile"),
+    "Xynth 1.5 Turbo": ("groq", "llama-3.1-8b-instant"),
+    "Xynth 1.5 Turbo (Fallback)": ("qwen", "qwen-turbo"),
 }
 
 DEFAULT_MODEL_CHAIN = [
-    "qwen3.5-omni-plus-2026-03-15", # new primary omni model
-    "openai/gpt-oss-120b",  # backup
-    "qwen-plus",  # alibaba — different daily quota, good reasoning
-    "llama-3.3-70b-versatile",  # backup
-    "llama-3.1-8b-instant",  # cheap fallback
-    "qwen-turbo",  # fast cheap fallback
-    "groq/compound",  # last resort, built-in tools
+    "Xynth 1.5",
+    "Xynth 1.5 (Fallback)",
+    "Xynth 1.5 Turbo",
+    "Xynth 1.5 Turbo (Fallback)",
 ]
 
 
@@ -1019,6 +1012,8 @@ class XynthRunner:
         today = self.usage.get(self._today(), {})
         out = []
         for m, _ in self.agents:
+            if "(Fallback)" in m:
+                continue
             used = today.get(m, {}).get("total", 0)
             limit = self.DAILY_TOKEN_LIMITS.get(m, 0)
             out.append({
@@ -1028,7 +1023,8 @@ class XynthRunner:
                 "left": max(0, limit - used) if limit else None,
                 "pct": round((used / limit) * 100, 1) if limit else 0,
             })
-        return {"date_utc": self._today(), "active": self.current_model, "models": out}
+        active_display = self.current_model.replace(" (Fallback)", "")
+        return {"date_utc": self._today(), "active": active_display, "models": out}
 
     @staticmethod
     def _extract_token_usage(msg):

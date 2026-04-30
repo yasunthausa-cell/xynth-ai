@@ -46,15 +46,15 @@ def _chunk_for_whatsapp(text: str, limit: int = 1500):
     return _msg.chunk_text(text, limit)
 
 
-@app.route("/")
-def landing():
-    """Serve the landing page."""
-    return render_template("index.html")
+@app.route("/", methods=["GET"])
+def index():
+    """Serve the web chat UI."""
+    return render_template("chat.html")
 
 
-@app.route("/chat")
+@app.route("/chat", methods=["GET"])
 def chat_page():
-    """Serve the main chat interface."""
+    """Serve the main chat interface as an alias."""
     return render_template("chat.html")
 
 
