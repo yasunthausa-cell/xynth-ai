@@ -822,6 +822,8 @@ MODEL_REGISTRY = {
     "Xynth 1.5 (Fallback)": ("groq", "llama-3.3-70b-versatile"),
     "Xynth 1.5 Turbo": ("groq", "llama-3.1-8b-instant"),
     "Xynth 1.5 Turbo (Fallback)": ("qwen", "qwen-turbo"),
+    "Xynth Local (Oracle)": ("ollama", "llama3:8b"),
+    "Xynth Local Turbo (Oracle)": ("ollama", "qwen:7b"),
 }
 
 DEFAULT_MODEL_CHAIN = [
@@ -829,7 +831,11 @@ DEFAULT_MODEL_CHAIN = [
     "Xynth 1.5 (Fallback)",
     "Xynth 1.5 Turbo",
     "Xynth 1.5 Turbo (Fallback)",
+    "Xynth Local (Oracle)",
+    "Xynth Local Turbo (Oracle)",
 ]
+
+_OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
 
 _QWEN_BASE_URL = os.environ.get(
@@ -930,6 +936,12 @@ def _build_llm(model_name: str):
         return ChatOpenAI(
             model=real_id, api_key=api_key, base_url=_QWEN_BASE_URL, temperature=0.1
         )
+    if provider == "ollama":
+        if ChatOpenAI is None:
+            raise RuntimeError("langchain-openai not installed; cannot use Ollama.")
+        return ChatOpenAI(
+            model=real_id, api_key="ollama", base_url=_OLLAMA_BASE_URL, temperature=0.1
+        )
     raise RuntimeError(f"Unknown provider for model: {model_name}")
 
 
@@ -975,14 +987,12 @@ class XynthRunner:
 
     # Conservative free-tier daily token caps (approximate — Groq/DashScope publish these).
     DAILY_TOKEN_LIMITS = {
-        "qwen3.5-omni-plus-2026-03-15": 1_000_000,
-        "openai/gpt-oss-120b":     200_000,
-        "qwen-plus":             1_000_000,
-        "qwen-max":                100_000,
-        "qwen-turbo":            1_000_000,
-        "llama-3.3-70b-versatile": 100_000,
-        "llama-3.1-8b-instant":    500_000,
-        "groq/compound":            70_000,
+        "Xynth 1.5":                 1_000_000,
+        "Xynth 1.5 (Fallback)":        100_000,
+        "Xynth 1.5 Turbo":             500_000,
+        "Xynth 1.5 Turbo (Fallback)": 1_000_000,
+        "Xynth Local (Oracle)":      999_999_999, # Unlimited
+        "Xynth Local Turbo (Oracle)": 999_999_999, # Unlimited
     }
 
     def __init__(self, model_names=None):

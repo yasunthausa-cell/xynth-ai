@@ -6,6 +6,9 @@
     <meta name="theme-color" content="#6366f1" />
     <link rel="manifest" href="/manifest.json" />
     <title>Xynth AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -56,11 +59,9 @@
         background: var(--bg-2);
         color: var(--text);
         font:
-          15px/1.6 -apple-system,
+          15px/1.6 "Montserrat",
+          -apple-system,
           BlinkMacSystemFont,
-          "Segoe UI",
-          Inter,
-          Roboto,
           sans-serif;
         overflow: hidden;
       }
@@ -122,16 +123,13 @@
         padding: 0 4px;
       }
       .brand .logo {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, var(--accent), var(--accent-2));
-        display: grid;
-        place-items: center;
-        color: #fff;
-        font-weight: 900;
-        font-size: 18px;
-        box-shadow: 0 6px 20px rgba(124, 92, 255, 0.4);
+        height: 26px;
+        width: auto;
+        display: block;
+        object-fit: contain;
+      }
+      [data-theme="dark"] .brand .logo {
+        filter: invert(1);
       }
       .brand small {
         display: block;
@@ -336,10 +334,13 @@
         gap: 4px;
       }
       .navbar .brand-name {
-        font-weight: 700;
-        font-size: 16px;
-        letter-spacing: -0.3px;
-        color: var(--text);
+        height: 22px;
+        width: auto;
+        display: block;
+        object-fit: contain;
+      }
+      [data-theme="dark"] .navbar .brand-name {
+        filter: invert(1);
       }
       .nav-btn {
         width: 38px;
@@ -1051,7 +1052,7 @@
             <button class="nav-btn" id="historyBtn" title="Chat History">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-            <span class="brand-name">Xynth AI</span>
+            <img src="/static/logo.png" alt="Xynth" class="brand-name">
           </div>
           <div class="nav-right">
             <button class="nav-btn" id="darkmodeBtn" title="Toggle dark mode">
