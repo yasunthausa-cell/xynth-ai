@@ -1,0 +1,43 @@
+name: Build Android APK
+
+on:
+  push:
+    paths:
+      - 'mobile_app/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Dependencies
+        working-directory: ./mobile_app
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "Xynth AI" "com.xynth.app" --web-dir www
+          npx cap add android
+
+      - name: Build APK
+        working-directory: ./mobile_app/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Xynth-AI-App
+          path: mobile_app/android/app/build/outputs/apk/debug/app-debug.apk
