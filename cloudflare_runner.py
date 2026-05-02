@@ -12,8 +12,8 @@ CF_API_TOKEN  = os.environ.get("CLOUDFLARE_API_TOKEN",  "cfut_8hFRjMD9E23N84tDo5
 
 # ── Models ────────────────────────────────────────────────────────────────────
 MODELS = {
-    "Xynth 1.5":       "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    "Xynth 1.5 Turbo": "@cf/meta/llama-3.1-8b-instruct",
+    "Xynth 1.5":       "@cf/meta/llama-4-scout-instruct", # Llama 4 Scout (Powerful/Fast)
+    "Xynth 1.5 Turbo": "@cf/meta/llama-3.2-3b-instruct",  # Lighter model for Turbo
 }
 
 # ── Daily message limits ───────────────────────────────────────────────────────
@@ -108,17 +108,8 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb
     # ── Resolve effective model (auto-fallback logic) ─────────────────────────
     effective_model = model_name
 
-    if model_name == "Xynth 1.5":
-        if _get_usage(session_id, "Xynth 1.5", sb, user_id) >= DAILY_LIMITS["Xynth 1.5"]:
-            # Silent fallback → Turbo
-            effective_model = "Xynth 1.5 Turbo"
-            yield f"data: {json.dumps({'type': 'model', 'name': effective_model})}\n\n"
-
-    if effective_model == "Xynth 1.5 Turbo":
-        if _get_usage(session_id, "Xynth 1.5 Turbo", sb, user_id) >= DAILY_LIMITS["Xynth 1.5 Turbo"]:
-            unlock = _unlock_datetime()
-            yield f"data: {json.dumps({'type': 'limit', 'unlock_utc': unlock.isoformat() + 'Z'})}\n\n"
-            return
+    # Limits have been removed as requested!
+    # Users can now send unlimited messages to Xynth 1.5 and Turbo.
 
     # ── Increment before calling (prevents double-spend on retry) ─────────────
     _increment_usage(session_id, effective_model, sb, user_id)

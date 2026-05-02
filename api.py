@@ -249,6 +249,18 @@ def get_chat_messages(chat_id):
         print("GET /chats/<id> error:", e)
         return jsonify([])
 
+@app.route("/api/announcement", methods=["GET"])
+def get_announcement():
+    """Endpoint for mobile app to fetch OTA popups/announcements from Supabase."""
+    if _sb:
+        try:
+            res = _sb.table("announcements").select("*").eq("active", True).order("created_at", desc=True).limit(1).execute()
+            if res.data:
+                return jsonify(res.data[0])
+        except Exception as e:
+            print("Announcement fetch error:", e)
+    return jsonify({"active": False})
+
 
 @app.route("/reset", methods=["POST"])
 def reset_cf_session():
