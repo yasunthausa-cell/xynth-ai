@@ -19,6 +19,7 @@ from langchain_core.messages import HumanMessage
 from agent import XynthRunner
 import scheduler as _sched
 import messaging as _msg
+import cloudflare_runner as _cf
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -119,9 +120,55 @@ def chat():
     return jsonify({"response": _run_agent(session_id, augmented)})
 
 
-@app.route("/chat/stream", methods=["GET"])
+@app.route("/chat/stream", methods=["GET", "POST"])
 def chat_stream():
-    """Server-Sent Events stream of the agent's progress for the web UI."""
+    """Server-Sent Events stream. Supports both GET (legacy) and POST (new CF runner)."""
+    # ── New POST path: Cloudflare Workers AI ─────────────────────────────────
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        session_id = str(data.get("session_id", "default"))
+        message    = (data.get("message") or "").strip()
+        model      = (data.get("model")   or "Xynth 1.5").strip()
+        chat_id    = str(data.get("chat_id", ""))
+        image_data = data.get("image_data", None)
+
+        user_id = None
+        if _sb:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                try:
+                    user_res = _sb.auth.get_user(token)
+                    if user_res and user_res.user:
+                        user_id = user_res.user.id
+                except Exception as e:
+                    print("Auth error:", e)
+
+        if not message:
+            return Response(
+                'data: {"type":"error","text":"empty message"}\n\n',
+                mimetype="text/event-stream"
+            )
+
+        def generate_cf():
+            yield from _cf.stream_chat(
+                session_id=session_id, 
+                message=message, 
+                model_name=model, 
+                sb=_sb, 
+                user_id=user_id, 
+                chat_id=chat_id, 
+                image_data=image_data
+            )
+
+        headers = {
+            "Content-Type":    "text/event-stream",
+            "Cache-Control":   "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+        return Response(stream_with_context(generate_cf()), headers=headers)
+
+    # ── Legacy GET path: original LangGraph runner ────────────────────────────
     session_id = str(request.args.get("session_id", "default"))
     message = (request.args.get("message") or "").strip()
     if not message:
@@ -147,8 +194,70 @@ def chat_stream():
 
 @app.route("/usage", methods=["GET"])
 def usage_endpoint():
-    """Return today's per-model token usage and remaining budget."""
+    """Return today's per-model token usage and remaining budget (legacy LangGraph runner)."""
     return jsonify(runner.usage_summary())
+
+@app.route("/usage/session")
+def usage_session():
+    """Return usage info for current session."""
+    session_id = request.args.get("session_id", "default")
+    user_id = None
+    if _sb:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                user_res = _sb.auth.get_user(token)
+                if user_res and user_res.user:
+                    user_id = user_res.user.id
+            except Exception:
+                pass
+    info = _cf.get_usage_info(session_id, _sb, user_id)
+    return jsonify(info)
+
+@app.route("/chats", methods=["GET"])
+def get_chats():
+    if not _sb: return jsonify([])
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "): return jsonify([])
+    token = auth_header.split(" ")[1]
+    try:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user: return jsonify([])
+        res = _sb.table("chats").select("id, title, created_at").eq("user_id", user_res.user.id).order("created_at", desc=True).execute()
+        return jsonify(res.data)
+    except Exception as e:
+        print("GET /chats error:", e)
+        return jsonify([])
+
+@app.route("/chats/<chat_id>", methods=["GET"])
+def get_chat_messages(chat_id):
+    if not _sb: return jsonify([])
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "): return jsonify([])
+    token = auth_header.split(" ")[1]
+    try:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user: return jsonify([])
+        # Verify ownership
+        chat_res = _sb.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        if not chat_res.data: return jsonify([])
+        
+        res = _sb.table("messages").select("role, content, created_at").eq("chat_id", chat_id).order("created_at").execute()
+        return jsonify(res.data)
+    except Exception as e:
+        print("GET /chats/<id> error:", e)
+        return jsonify([])
+
+
+@app.route("/reset", methods=["POST"])
+def reset_cf_session():
+    """Reset conversation history for a session in the CF runner."""
+    data = request.get_json(silent=True) or {}
+    sid = (data.get("session_id") or "").strip()
+    if sid:
+        _cf.reset_session(sid)
+    return jsonify({"ok": True})
 
 
 @app.route("/transcribe", methods=["POST"])
