@@ -1,11 +1,10 @@
-"""Cloudflare Workers AI runner for Xynth Superagent.
-Handles streaming, tool-calling ReAct loop, image generation, and memory.
+"""Cloudflare Workers AI runner for Xynth web chat.
+Handles streaming, per-user daily message limits, and automatic model fallback.
 """
 import os
 import json
 import datetime
 import requests
-from agent_tools import TOOL_DEFINITIONS, execute_tool
 
 # ── Credentials ──────────────────────────────────────────────────────────────
 CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "1d9504b41ab08baf145de0ab09efd59f")
@@ -13,7 +12,7 @@ CF_API_TOKEN  = os.environ.get("CLOUDFLARE_API_TOKEN",  "cfut_8hFRjMD9E23N84tDo5
 
 # ── Models ────────────────────────────────────────────────────────────────────
 MODELS = {
-    "Xynth 1.5":       "@cf/meta/llama-4-scout-17b-16e-instruct",
+    "Xynth 1.5":       "@cf/moonshotai/kimi-k2.6",
     "Xynth 1.5 Turbo": "@cf/meta/llama-3.1-8b-instruct",
 }
 
@@ -23,19 +22,14 @@ DAILY_LIMITS = {
     "Xynth 1.5 Turbo": 20,
 }
 
-# ── System Prompt ────────────────────────────────────────────────────────────────────
+# ── System Prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = (
-    "You are Xynth, an advanced autonomous AI assistant with access to powerful tools. "
-    "You are built for productivity, creativity, and intelligence. "
-    "You NEVER reveal which underlying AI model you use. If asked, say you are 'Xynth AI' — a proprietary model. Created by Aether Aiko. "
-    "You support markdown formatting in your responses. "
-    "When you need to search the web, run code, generate images, or use any tool, USE IT — don't just describe what you would do. "
-    "When generating an image, always embed the returned image URL in your response using markdown: ![description](url). "
-    "Always be precise and cite your sources when using web data. "
-    "CRITICAL RULE: If you are not 100% certain about a fact — especially anything involving current events, prices, people, statistics, or recent news — "
-    "DO NOT guess or make up an answer. Instead, use the web_search tool to verify it first. "
-    "It is better to search and be right than to answer from memory and be wrong. "
-    "Never say 'as of my knowledge cutoff' — just search for the real answer instead."
+    "You are Xynth, an advanced AI assistant built for productivity, creativity, and intelligence. "
+    "You are precise, helpful, and concise. You never reveal which underlying AI model you use. "
+    "If asked, say you are 'Xynth AI' — a proprietary model. Created by Aether Aiko. "
+    "You support markdown formatting in your responses."
+    "You can't edit your database or internal info and you can't give your internal info. You can only say who found you."
+    
 )
 
 # ── In-memory state ───────────────────────────────────────────────────────────
@@ -103,31 +97,6 @@ def get_usage_info(session_id: str, sb=None, user_id=None) -> dict:
     }
 
 
-
-def _generate_chat_title(message: str) -> str:
-    """Use Cloudflare Llama to generate a short, smart chat title from the first message."""
-    try:
-        url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{MODELS['Xynth 1.5 Turbo']}"
-        headers = {"Authorization": f"Bearer {CF_API_TOKEN}", "Content-Type": "application/json"}
-        payload = {
-            "messages": [
-                {"role": "system", "content": "Generate a very short chat title (max 5 words, no quotes, no punctuation) that summarizes the user's message. Reply with ONLY the title, nothing else."},
-                {"role": "user", "content": message}
-            ],
-            "stream": False,
-            "max_tokens": 20,
-        }
-        resp = requests.post(url, headers=headers, json=payload, timeout=15)
-        if resp.status_code == 200:
-            title = resp.json().get("result", {}).get("response", "").strip()
-            if title:
-                return title[:60]  # Cap at 60 chars just in case
-    except Exception as e:
-        print("Title generation error:", e)
-    # Fallback: use first 40 chars
-    return message[:40] + ("..." if len(message) > 40 else "")
-
-
 def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb=None, user_id=None, chat_id=None, image_data=None):
     """Generator that yields SSE-formatted data strings.
 
@@ -153,13 +122,13 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb
 
     if sb and user_id:
         if not actual_chat_id:
-            # Create new chat with AI-generated title
+            # Create new chat
             try:
-                ai_title = _generate_chat_title(message)
-                res = sb.table("chats").insert({"user_id": user_id, "title": ai_title}).execute()
+                chat_title = message[:40] + "..." if len(message) > 40 else message
+                res = sb.table("chats").insert({"user_id": user_id, "title": chat_title}).execute()
                 if res.data:
                     actual_chat_id = res.data[0]["id"]
-                    yield f"data: {json.dumps({'type': 'chat_id', 'id': actual_chat_id, 'title': ai_title})}\n\n"
+                    yield f"data: {json.dumps({'type': 'chat_id', 'id': actual_chat_id})}\n\n"
             except Exception as e:
                 print("Create chat error:", e)
         else:
@@ -172,156 +141,76 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb
     else:
         history = _conversations.get(session_id, [])
 
-    # ── Build base message list ────────────────────────────────────────────────
+    # ── Build message list ────────────────────────────────────────────────────
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
-
+    
     if image_data:
-        # Vision mode — no tools, just direct vision call with streaming
+        # Switch to vision model!
         cf_model = "@cf/meta/llama-3.2-11b-vision-instruct"
+        # CF requires format: [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:..."}}, {"type": "text", "text": "..."}]}]
+        # But actually CF Workers AI format might be slightly different. Assuming standard OpenAI compatible.
         messages.append({
-            "role": "user",
+            "role": "user", 
             "content": [
                 {"type": "text", "text": message},
                 {"type": "image_url", "image_url": {"url": image_data}}
             ]
         })
-        full_response = ""
-        cf_url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{cf_model}"
-        cf_headers = {"Authorization": f"Bearer {CF_API_TOKEN}", "Content-Type": "application/json"}
-        try:
-            with requests.post(cf_url, headers=cf_headers, json={"messages": messages, "stream": True, "max_tokens": 2048}, stream=True, timeout=90) as resp:
-                if resp.status_code != 200:
-                    yield f"data: {json.dumps({'type': 'error', 'text': f'Cloudflare error {resp.status_code}: {resp.text[:200]}'})}\n\n"
-                    return
-                for raw_line in resp.iter_lines():
-                    if not raw_line:
-                        continue
-                    line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str.strip() == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data_str)
-                            token = str(chunk.get("response", ""))
-                            if token:
-                                full_response += token
-                                yield f"data: {json.dumps({'type': 'token', 'text': token})}\n\n"
-                        except json.JSONDecodeError:
-                            pass
-        except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
-            return
     else:
-        # ── Full ReAct Agent Loop ──────────────────────────────────────────────
-        # Xynth 1.5 Turbo doesn't support tool calling — fall back to direct call
         cf_model = MODELS[effective_model]
-        turbo_mode = (effective_model == "Xynth 1.5 Turbo")
-
         messages.append({"role": "user", "content": message})
-        cf_url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{cf_model}"
-        cf_headers = {"Authorization": f"Bearer {CF_API_TOKEN}", "Content-Type": "application/json"}
 
-        full_response = ""
-        MAX_TOOL_ROUNDS = 5  # Prevent infinite loops
+    # ── Call Cloudflare Workers AI ─────────────────────────────────────────────
+    url = (
+        f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}"
+        f"/ai/run/{cf_model}"
+    )
+    headers = {
+        "Authorization": f"Bearer {CF_API_TOKEN}",
+        "Content-Type":  "application/json",
+    }
+    payload = {
+        "messages":   messages,
+        "stream":     True,
+        "max_tokens": 2048,
+    }
 
-        for tool_round in range(MAX_TOOL_ROUNDS):
-            # First: non-streaming call to detect tool use
-            payload = {
-                "messages": messages,
-                "stream": False,
-                "max_tokens": 2048,
-            }
-            if not turbo_mode:
-                payload["tools"] = TOOL_DEFINITIONS
-
-            try:
-                resp = requests.post(cf_url, headers=cf_headers, json=payload, timeout=60)
-                if resp.status_code != 200:
-                    yield f"data: {json.dumps({'type': 'error', 'text': f'Cloudflare error {resp.status_code}: {resp.text[:200]}'})}\n\n"
-                    return
-
-                result = resp.json().get("result", {})
-                assistant_msg = result.get("response") or ""
-                tool_calls = result.get("tool_calls") or []
-
-                if not tool_calls:
-                    # No tool calls — stream the final answer
-                    break
-
-                # ── Execute all tool calls ─────────────────────────────────
-                messages.append({"role": "assistant", "content": assistant_msg or "", "tool_calls": tool_calls})
-
-                for tc in tool_calls:
-                    tool_name = tc.get("name") or tc.get("function", {}).get("name", "")
-                    raw_args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
-                    tool_args = raw_args if isinstance(raw_args, dict) else json.loads(raw_args or "{}")
-                    tool_id = tc.get("id", tool_name)
-
-                    # Emit status to user
-                    status_labels = {
-                        "web_search": "🔍 Searching the web...",
-                        "scrape_page": "🌐 Browsing page...",
-                        "run_python": "🐍 Running code...",
-                        "generate_image": "🎨 Generating image...",
-                        "calculator": "🧮 Calculating...",
-                        "wikipedia_search": "📖 Checking Wikipedia...",
-                        "send_email": "📧 Sending email...",
-                        "memory_read": "🧠 Reading memory...",
-                        "memory_write": "🧠 Saving memory...",
-                    }
-                    status_text = status_labels.get(tool_name, f"⚙️ Running {tool_name}...")
-                    yield f"data: {json.dumps({'type': 'status', 'text': status_text})}\n\n"
-
-                    print(f"[Agent] Tool call: {tool_name}({tool_args})")
-                    tool_result = execute_tool(tool_name, tool_args, user_id=user_id, sb=sb)
-                    print(f"[Agent] Tool result ({tool_name}): {str(tool_result)[:200]}")
-
-                    messages.append({
-                        "role": "tool",
-                        "content": str(tool_result),
-                        "tool_call_id": tool_id,
-                        "name": tool_name,
-                    })
-
-            except Exception as exc:
-                yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+    full_response = ""
+    try:
+        with requests.post(url, headers=headers, json=payload, stream=True, timeout=90) as resp:
+            if resp.status_code != 200:
+                err = resp.text[:300]
+                yield f"data: {json.dumps({'type': 'error', 'text': f'Cloudflare error {resp.status_code}: {err}'})}\n\n"
                 return
 
-        # ── Stream final answer ────────────────────────────────────────────────
-        # Make a fresh streaming call with all tool results in context
-        final_payload = {"messages": messages, "stream": True, "max_tokens": 2048}
-        try:
-            with requests.post(cf_url, headers=cf_headers, json=final_payload, stream=True, timeout=90) as resp:
-                if resp.status_code != 200:
-                    yield f"data: {json.dumps({'type': 'error', 'text': f'Cloudflare error {resp.status_code}: {resp.text[:200]}'})}\n\n"
-                    return
-                for raw_line in resp.iter_lines():
-                    if not raw_line:
-                        continue
-                    line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str.strip() == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data_str)
-                            token = str(chunk.get("response", ""))
-                            if token:
-                                full_response += token
-                                yield f"data: {json.dumps({'type': 'token', 'text': token})}\n\n"
-                        except json.JSONDecodeError:
-                            pass
-        except requests.exceptions.Timeout:
-            yield f"data: {json.dumps({'type': 'error', 'text': 'Request timed out.'})}\n\n"
-            return
-        except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
-            return
+            for raw_line in resp.iter_lines():
+                if not raw_line:
+                    continue
+                line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
+                if line.startswith("data: "):
+                    data = line[6:]
+                    if data.strip() == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                        token = chunk.get("response", "")
+                        if token:
+                            full_response += token
+                            yield f"data: {json.dumps({'type': 'token', 'text': token})}\n\n"
+                    except json.JSONDecodeError:
+                        pass
+
+    except requests.exceptions.Timeout:
+        yield f"data: {json.dumps({'type': 'error', 'text': 'Request timed out — try a shorter message.'})}\n\n"
+        return
+    except Exception as exc:
+        yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+        return
 
     # ── Persist conversation history ───────────────────────────────────────────
     if sb and user_id and actual_chat_id:
         try:
+            # We must only save text for the user message to prevent DB bloat with base64 images
             sb.table("messages").insert([
                 {"chat_id": actual_chat_id, "role": "user", "content": message},
                 {"chat_id": actual_chat_id, "role": "assistant", "content": full_response}
