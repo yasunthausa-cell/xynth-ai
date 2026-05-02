@@ -137,20 +137,26 @@
             color: var(--text-secondary);
         }
         .chat-list {
-            flex: 1;
             overflow-y: auto;
-            margin-top: 16px;
-            border-top: 1px solid var(--border);
-            padding-top: 16px;
+            margin-top: 8px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 2px;
+            max-height: calc(100vh - 260px);
+        }
+        .chat-list-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            padding: 12px 12px 4px;
         }
         .history-item {
-            padding: 10px 12px;
+            padding: 9px 12px;
             border-radius: 8px;
             color: var(--text-secondary);
-            font-size: 14px;
+            font-size: 13px;
             cursor: pointer;
             white-space: nowrap;
             overflow: hidden;
@@ -158,6 +164,8 @@
             background: transparent;
             border: none;
             text-align: left;
+            width: 100%;
+            transition: background 0.15s, color 0.15s;
         }
         .history-item:hover, .history-item.active {
             background: var(--surface-hover);
@@ -462,6 +470,7 @@
         <a href="#" class="nav-btn">Docs</a>
         <a href="#" class="nav-btn">What's New</a>
 
+        <div class="chat-list-label">Recent</div>
         <div class="chat-list" id="chatList">
             <!-- Historical chats will go here -->
         </div>

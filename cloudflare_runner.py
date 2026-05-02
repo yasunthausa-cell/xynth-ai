@@ -31,7 +31,11 @@ SYSTEM_PROMPT = (
     "You support markdown formatting in your responses. "
     "When you need to search the web, run code, generate images, or use any tool, USE IT — don't just describe what you would do. "
     "When generating an image, always embed the returned image URL in your response using markdown: ![description](url). "
-    "Always be precise and cite your sources when using web data."
+    "Always be precise and cite your sources when using web data. "
+    "CRITICAL RULE: If you are not 100% certain about a fact — especially anything involving current events, prices, people, statistics, or recent news — "
+    "DO NOT guess or make up an answer. Instead, use the web_search tool to verify it first. "
+    "It is better to search and be right than to answer from memory and be wrong. "
+    "Never say 'as of my knowledge cutoff' — just search for the real answer instead."
 )
 
 # ── In-memory state ───────────────────────────────────────────────────────────
@@ -99,6 +103,31 @@ def get_usage_info(session_id: str, sb=None, user_id=None) -> dict:
     }
 
 
+
+def _generate_chat_title(message: str) -> str:
+    """Use Cloudflare Llama to generate a short, smart chat title from the first message."""
+    try:
+        url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{MODELS['Xynth 1.5 Turbo']}"
+        headers = {"Authorization": f"Bearer {CF_API_TOKEN}", "Content-Type": "application/json"}
+        payload = {
+            "messages": [
+                {"role": "system", "content": "Generate a very short chat title (max 5 words, no quotes, no punctuation) that summarizes the user's message. Reply with ONLY the title, nothing else."},
+                {"role": "user", "content": message}
+            ],
+            "stream": False,
+            "max_tokens": 20,
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=15)
+        if resp.status_code == 200:
+            title = resp.json().get("result", {}).get("response", "").strip()
+            if title:
+                return title[:60]  # Cap at 60 chars just in case
+    except Exception as e:
+        print("Title generation error:", e)
+    # Fallback: use first 40 chars
+    return message[:40] + ("..." if len(message) > 40 else "")
+
+
 def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb=None, user_id=None, chat_id=None, image_data=None):
     """Generator that yields SSE-formatted data strings.
 
@@ -124,13 +153,13 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb
 
     if sb and user_id:
         if not actual_chat_id:
-            # Create new chat
+            # Create new chat with AI-generated title
             try:
-                chat_title = message[:40] + "..." if len(message) > 40 else message
-                res = sb.table("chats").insert({"user_id": user_id, "title": chat_title}).execute()
+                ai_title = _generate_chat_title(message)
+                res = sb.table("chats").insert({"user_id": user_id, "title": ai_title}).execute()
                 if res.data:
                     actual_chat_id = res.data[0]["id"]
-                    yield f"data: {json.dumps({'type': 'chat_id', 'id': actual_chat_id})}\n\n"
+                    yield f"data: {json.dumps({'type': 'chat_id', 'id': actual_chat_id, 'title': ai_title})}\n\n"
             except Exception as e:
                 print("Create chat error:", e)
         else:
