@@ -12,8 +12,8 @@ CF_API_TOKEN  = os.environ.get("CLOUDFLARE_API_TOKEN",  "cfut_8hFRjMD9E23N84tDo5
 
 # ── Models ────────────────────────────────────────────────────────────────────
 MODELS = {
-    "Xynth 1.5":       "@cf/meta/llama-4-scout-instruct", # Llama 4 Scout (Powerful/Fast)
-    "Xynth 1.5 Turbo": "@cf/meta/llama-3.2-3b-instruct",  # Lighter model for Turbo
+    "Xynth 1.5":       "@cf/meta/llama-4-scout-17b-16e-instruct",
+    "Xynth 1.5 Turbo": "@cf/meta/llama-3.1-8b-instruct",
 }
 
 # ── Daily message limits ───────────────────────────────────────────────────────
