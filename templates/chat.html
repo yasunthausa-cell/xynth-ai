@@ -858,6 +858,11 @@
                                     fullText += data.text;
                                     botBubble.innerHTML = marked.parse(fullText);
                                     chatView.scrollTop = chatView.scrollHeight;
+                                } else if (data.type === 'status') {
+                                    // Show live status like "Searching the web..."
+                                    if (!fullText) {
+                                        botBubble.innerHTML = `<span style="opacity:0.5;font-style:italic">🔍 ${data.text}</span>`;
+                                    }
                                 } else if (data.type === 'chat_id') {
                                     currentChatId = data.id;
                                     loadChatHistory(); // refresh sidebar

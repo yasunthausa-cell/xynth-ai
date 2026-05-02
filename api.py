@@ -102,6 +102,13 @@ def serve_media(filename):
     return send_from_directory(STATIC_DIR, filename)
 
 
+@app.route("/static_media/<path:filename>", methods=["GET"])
+def serve_generated_media(filename):
+    """Serve AI-generated images from the static_media directory."""
+    media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
+    return send_from_directory(media_dir, filename)
+
+
 @app.route("/manifest.json", methods=["GET"])
 def serve_manifest():
     """Serve the PWA manifest."""
