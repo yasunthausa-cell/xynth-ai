@@ -21,6 +21,8 @@ import scheduler as _sched
 import messaging as _msg
 import groq_runner as _cf
 import builder_runner as _builder
+import research_runner as _research
+import rag_pipeline as _rag
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -94,6 +96,84 @@ def builder_stream():
     gen = _builder.stream_build(session_id, message, sb=sb, user_id=user_id, project_id=project_id)
     return Response(stream_with_context(gen), content_type="text/event-stream",
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
+
+
+# ── Research Routes ───────────────────────────────────────────────────────────
+@app.route("/research", methods=["GET"])
+def research_page():
+    return render_template("research.html")
+
+
+@app.route("/research/stream", methods=["POST"])
+def research_stream():
+    body       = request.get_json(force=True) or {}
+    query      = body.get("query", "").strip()
+    session_id = body.get("session_id", "anon")
+    chat_id    = body.get("chat_id")
+    if not query:
+        return jsonify({"error": "query required"}), 400
+
+    token   = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id, sb = None, None
+    if token and _sb:
+        try:
+            user_id = _sb.auth.get_user(token).user.id
+            sb = _sb
+        except Exception:
+            pass
+
+    gen = _research.stream_research(session_id, query, sb=sb, user_id=user_id, chat_id=chat_id)
+    return Response(stream_with_context(gen), content_type="text/event-stream",
+                    headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
+
+
+# ── Document Upload (RAG) ─────────────────────────────────────────────────────
+@app.route("/documents/upload", methods=["POST"])
+def upload_document():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token or not _sb:
+        return jsonify({"error": "Authentication required"}), 401
+    try:
+        user_id = _sb.auth.get_user(token).user.id
+    except Exception:
+        return jsonify({"error": "Invalid token"}), 401
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    f         = request.files["file"]
+    file_bytes = f.read()
+    file_type  = f.content_type or "text/plain"
+    doc_title  = f.filename or "Untitled"
+
+    result = _rag.store_document(user_id, doc_title, file_bytes, file_type, _sb)
+    return jsonify(result)
+
+
+@app.route("/documents", methods=["GET"])
+def list_documents():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token or not _sb:
+        return jsonify([]), 200
+    try:
+        user_id = _sb.auth.get_user(token).user.id
+        docs = _rag.list_user_documents(user_id, _sb)
+        return jsonify(docs)
+    except Exception:
+        return jsonify([]), 200
+
+
+@app.route("/documents/<doc_title>", methods=["DELETE"])
+def delete_document(doc_title):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token or not _sb:
+        return jsonify({"error": "Auth required"}), 401
+    try:
+        user_id = _sb.auth.get_user(token).user.id
+        ok = _rag.delete_user_document(user_id, doc_title, _sb)
+        return jsonify({"success": ok})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/health", methods=["GET"])
@@ -189,15 +269,19 @@ def chat_stream():
             )
 
         def generate_cf():
-            yield from _cf.stream_chat(
-                session_id=session_id, 
-                message=message, 
-                model_name=model, 
-                sb=_sb, 
-                user_id=user_id, 
-                chat_id=chat_id, 
-                image_data=image_data
-            )
+            # Vision queries still go through groq_runner
+            if image_data:
+                yield from _cf.stream_chat(
+                    session_id=session_id, message=message,
+                    model_name=model, sb=_sb, user_id=user_id,
+                    chat_id=chat_id, image_data=image_data
+                )
+            else:
+                # All text queries → research engine
+                yield from _research.stream_research(
+                    session_id=session_id, query=message,
+                    sb=_sb, user_id=user_id, chat_id=chat_id
+                )
 
         headers = {
             "Content-Type":    "text/event-stream",

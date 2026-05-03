@@ -16,3 +16,6 @@ wikipedia
 groq
 supabase
 openai
+pypdf
+pdfplumber
+fpdf2

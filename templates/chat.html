@@ -467,7 +467,7 @@
             New Chat
         </button>
         <a href="#" class="nav-btn">Pricing</a>
-        <a href="#" class="nav-btn">Docs</a>
+        <a href="/build" class="nav-btn">🏗️ Builder</a>
         <a href="#" class="nav-btn">What's New</a>
 
         <div class="chat-list-label">Recent</div>
@@ -495,10 +495,10 @@
         <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column;">
             <div class="spacer"></div> <!-- Pushes suggestions down initially -->
             <div id="suggestions" class="suggestions">
-                <button class="suggestion-chip">Write a cold email to a client</button>
-                <button class="suggestion-chip">Plan a 5-day trip to Japan</button>
-                <button class="suggestion-chip">Explain quantum computing simply</button>
-                <button class="suggestion-chip">Write a python script to scrape data</button>
+                <button class="suggestion-chip">⚛️ How does quantum computing threaten encryption?</button>
+                <button class="suggestion-chip">🌍 Latest news in artificial intelligence 2025</button>
+                <button class="suggestion-chip">📊 What causes inflation and how to fight it?</button>
+                <button class="suggestion-chip">🧬 Explain CRISPR gene editing and its risks</button>
             </div>
             <div class="messages-container" id="messagesContainer"></div>
         </div>
@@ -513,7 +513,7 @@
                 <button class="icon-btn" id="addFileBtn" title="Add File">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 </button>
-                <textarea id="messageInput" placeholder="Message Xynth..." rows="1"></textarea>
+                <textarea id="messageInput" placeholder="Research anything... ask a question, get cited answers" rows="1"></textarea>
                 <button class="icon-btn" id="voiceBtn" title="Voice Input">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
                 </button>
@@ -868,25 +868,60 @@
                                     botBubble.innerHTML = marked.parse(fullText);
                                     chatView.scrollTop = chatView.scrollHeight;
                                 } else if (data.type === 'status') {
-                                    // Show live status like "Searching the web..."
                                     if (!fullText) {
-                                        botBubble.innerHTML = `<span style="opacity:0.5;font-style:italic">🔍 ${data.text}</span>`;
+                                        botBubble.innerHTML = `<div style="display:flex;align-items:center;gap:8px;opacity:0.7;font-style:italic;font-size:13px">
+                                            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite"></span>
+                                            ${data.text}</div>`;
                                     }
+                                } else if (data.type === 'sources') {
+                                    // Inject a sources panel after the answer renders
+                                    botBubble.dataset.sources = JSON.stringify(data.sources);
+                                } else if (data.type === 'images') {
+                                    // Render images inline after the text
+                                    const grid = document.createElement('div');
+                                    grid.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px';
+                                    data.images.forEach(img => {
+                                        const a = document.createElement('a');
+                                        a.href = img.source || img.url;
+                                        a.target = '_blank';
+                                        a.innerHTML = `<img src="${img.url}" alt="${img.title}" style="width:100%;border-radius:8px;object-fit:cover;height:130px;border:1px solid var(--border)" onerror="this.parentElement.style.display='none'">`;
+                                        grid.appendChild(a);
+                                    });
+                                    botBubble.appendChild(grid);
+                                } else if (data.type === 'pdf') {
+                                    // Show PDF download button
+                                    const btn = document.createElement('a');
+                                    btn.href = data.url;
+                                    btn.download = (data.title || 'research') + '.pdf';
+                                    btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:8px 16px;background:linear-gradient(135deg,#7c5cfc,#5c8dfc);color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500';
+                                    btn.innerHTML = '📄 Download PDF Report';
+                                    botBubble.appendChild(btn);
                                 } else if (data.type === 'chat_id') {
                                     currentChatId = data.id;
-                                    loadChatHistory(); // refresh sidebar
+                                    loadChatHistory();
                                 } else if (data.type === 'model') {
                                     modelSelector.value = data.name;
                                 } else if (data.type === 'limit') {
                                     showLimitModal(data.unlock_utc, modelSelector.value);
-                                    if (modelSelector.value === 'Xynth 1.5') {
-                                        modelSelector.value = 'Xynth 1.5 Turbo';
-                                    }
-                                    if (!fullText) {
-                                        botBubble.innerHTML = '<span style="color:#ef4444">Message blocked due to daily limit.</span>';
-                                    }
+                                    if (modelSelector.value === 'Xynth 1.5') modelSelector.value = 'Xynth 1.5 Turbo';
+                                    if (!fullText) botBubble.innerHTML = '<span style="color:#ef4444">Message blocked due to daily limit.</span>';
                                 } else if (data.type === 'error') {
                                     botBubble.innerHTML += `<br><span style="color:#ef4444">Error: ${data.text}</span>`;
+                                } else if (data.type === 'done' && botBubble.dataset.sources) {
+                                    // Append collapsible sources section
+                                    try {
+                                        const sources = JSON.parse(botBubble.dataset.sources);
+                                        if (sources.length) {
+                                            const sid = 'src_' + Date.now();
+                                            const wrap = document.createElement('div');
+                                            wrap.style.cssText = 'margin-top:14px;border-top:1px solid var(--border);padding-top:10px';
+                                            wrap.innerHTML = `<button onclick="document.getElementById('${sid}').style.display=document.getElementById('${sid}').style.display==='none'?'block':'none'" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0">📚 ${sources.length} Sources — click to expand</button>
+                                            <div id="${sid}" style="display:none;margin-top:8px;display:flex;flex-direction:column;gap:4px">`
+                                            + sources.map((s,i) => `<a href="${s.url}" target="_blank" style="font-size:12px;color:var(--text2);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border)">[${i+1}] ${s.title}</a>`).join('')
+                                            + `</div>`;
+                                            botBubble.appendChild(wrap);
+                                        }
+                                    } catch(e) {}
                                 }
                             } catch (e) {
                                 console.error("JSON parse error on SSE chunk", e, dataStr);
