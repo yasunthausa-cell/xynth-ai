@@ -4,7 +4,7 @@ langchain-groq
 langgraph
 beautifulsoup4
 requests
-ddgs
+duckduckgo-search
 langchain-core
 langgraph-checkpoint
 playwright
@@ -13,3 +13,6 @@ apscheduler
 pytz
 langchain-openai
 wikipedia
+groq
+supabase
+openai

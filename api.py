@@ -19,7 +19,8 @@ from langchain_core.messages import HumanMessage
 from agent import XynthRunner
 import scheduler as _sched
 import messaging as _msg
-import cloudflare_runner as _cf
+import groq_runner as _cf
+import builder_runner as _builder
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -49,20 +50,50 @@ def _chunk_for_whatsapp(text: str, limit: int = 1500):
 
 @app.route("/", methods=["GET"])
 def index():
-    """Serve the web chat UI."""
     return render_template("chat.html")
 
 
 @app.route("/chat", methods=["GET"])
 def chat_page():
-    """Serve the main chat interface as an alias."""
     return render_template("chat.html")
 
 
 @app.route("/home", methods=["GET"])
 def home():
-    """Serve the web chat UI."""
     return render_template("chat.html")
+
+
+@app.route("/build", methods=["GET"])
+def builder_page():
+    """Serve the app builder UI."""
+    return render_template("builder.html")
+
+
+@app.route("/build/stream", methods=["POST"])
+def builder_stream():
+    """Stream AI-generated code for the builder."""
+    body        = request.get_json(force=True) or {}
+    message     = body.get("message", "").strip()
+    session_id  = body.get("session_id", "anon")
+    project_id  = body.get("project_id")
+
+    # Auth (optional)
+    token   = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = None
+    sb      = None
+    if token and _sb:
+        try:
+            user_id = _sb.auth.get_user(token).user.id
+            sb = _sb
+        except Exception:
+            pass
+
+    if not message:
+        return jsonify({"error": "message required"}), 400
+
+    gen = _builder.stream_build(session_id, message, sb=sb, user_id=user_id, project_id=project_id)
+    return Response(stream_with_context(gen), content_type="text/event-stream",
+                    headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
 @app.route("/health", methods=["GET"])

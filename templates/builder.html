@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xynth Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a24;
+  --border: #2a2a3a;
+  --text: #f0f0f5;
+  --text2: #888899;
+  --accent: #7c5cfc;
+  --accent2: #5c8dfc;
+  --success: #22c55e;
+  --danger: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Top bar ── */
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.topbar .logo { font-weight: 700; font-size: 16px; background: linear-gradient(135deg, #7c5cfc, #5c8dfc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.topbar .logo span { font-weight: 400; opacity: 0.7; }
+.project-name { background: transparent; border: 1px solid transparent; color: var(--text); font-size: 14px; padding: 4px 8px; border-radius: 6px; outline: none; min-width: 160px; }
+.project-name:hover, .project-name:focus { border-color: var(--border); background: var(--surface2); }
+.topbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.btn-primary { background: linear-gradient(135deg, #7c5cfc, #5c8dfc); color: #fff; }
+.btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+.btn-publish { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+.btn-publish:hover { opacity: 0.85; }
+.btn-publish.locked { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); cursor: not-allowed; }
+
+/* ── Main layout ── */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Left: Chat panel ── */
+.chat-panel {
+  width: 380px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.chat-header h2 { font-size: 14px; font-weight: 600; }
+.chat-header p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.messages::-webkit-scrollbar { width: 4px; }
+.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+.msg.user { align-self: flex-end; background: linear-gradient(135deg, #7c5cfc33, #5c8dfc33); border: 1px solid #7c5cfc55; }
+.msg.bot { align-self: flex-start; background: var(--surface2); border: 1px solid var(--border); }
+.msg.status { align-self: center; background: transparent; border: none; color: var(--text2); font-size: 12px; font-style: italic; }
+.suggestions { padding: 0 16px 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text2); cursor: pointer; transition: all 0.15s; }
+.chip:hover { border-color: var(--accent); color: var(--text); }
+.input-area { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.input-area textarea {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 10px; padding: 10px 12px;
+  font-size: 13px; font-family: inherit; resize: none;
+  outline: none; max-height: 120px; min-height: 42px;
+}
+.input-area textarea:focus { border-color: var(--accent); }
+.send-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: linear-gradient(135deg, #7c5cfc, #5c8dfc);
+  border: none; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; align-self: flex-end; transition: all 0.15s;
+}
+.send-btn:hover { opacity: 0.85; transform: scale(1.05); }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── Right: Preview panel ── */
+.preview-panel { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+.preview-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.preview-toolbar .tab { padding: 5px 12px; border-radius: 6px; font-size: 12px; color: var(--text2); cursor: pointer; border: none; background: transparent; }
+.preview-toolbar .tab.active { background: var(--surface2); color: var(--text); }
+.device-btns { display: flex; gap: 4px; margin-left: auto; }
+.device-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.device-btn.active, .device-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+.preview-frame {
+  flex: 1; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: #1a1a2e;
+}
+#previewIframe { width: 100%; height: 100%; border: none; background: #fff; }
+#previewIframe.mobile { width: 390px; height: 844px; border-radius: 16px; box-shadow: 0 0 60px #0006; }
+#previewIframe.tablet { width: 768px; height: 90%; border-radius: 12px; box-shadow: 0 0 60px #0006; }
+.code-view { flex: 1; overflow: auto; padding: 16px; display: none; }
+.code-view pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-size: 12px; line-height: 1.6; color: #c9d1d9; white-space: pre-wrap; word-break: break-all; }
+.empty-state {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; color: var(--text2); text-align: center; padding: 32px;
+}
+.empty-state .icon { font-size: 48px; opacity: 0.5; }
+.empty-state h3 { font-size: 18px; font-weight: 600; color: var(--text); }
+.empty-state p { font-size: 14px; max-width: 320px; }
+
+/* ── Publish modal ── */
+.modal-overlay { position: fixed; inset: 0; background: #000a; display: none; align-items: center; justify-content: center; z-index: 100; }
+.modal-overlay.show { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 400px; }
+.modal h2 { font-size: 20px; margin-bottom: 8px; }
+.modal p { color: var(--text2); font-size: 14px; margin-bottom: 24px; }
+.modal .price { font-size: 36px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.modal .price span { font-size: 16px; font-weight: 400; color: var(--text2); }
+.modal-actions { display: flex; gap: 8px; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="logo">Xynth <span>Builder</span></div>
+  <svg width="1" height="20" style="background:var(--border);flex-shrink:0"></svg>
+  <input class="project-name" id="projectName" value="Untitled Project" />
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" id="newProjectBtn">+ New</button>
+    <button class="btn btn-ghost" id="downloadBtn">⬇ Download</button>
+    <button class="btn btn-publish locked" id="publishBtn">🔒 Publish — $5/mo</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <h2>✦ AI Builder</h2>
+      <p>Describe what you want to build</p>
+    </div>
+    <div class="messages" id="messages">
+      <div class="msg bot">👋 Hi! Tell me what to build — a landing page, dashboard, game, portfolio, or any web app. I'll generate it live!</div>
+    </div>
+    <div class="suggestions" id="suggestions">
+      <div class="chip" onclick="sendSuggestion('A dark SaaS landing page with pricing')">SaaS landing page</div>
+      <div class="chip" onclick="sendSuggestion('A personal portfolio with animations')">Portfolio site</div>
+      <div class="chip" onclick="sendSuggestion('A todo app with local storage')">Todo app</div>
+      <div class="chip" onclick="sendSuggestion('A snake game in JavaScript')">Snake game</div>
+      <div class="chip" onclick="sendSuggestion('An admin dashboard with charts')">Admin dashboard</div>
+    </div>
+    <div class="input-area">
+      <textarea id="msgInput" placeholder="Describe your app..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview Panel -->
+  <div class="preview-panel">
+    <div class="preview-toolbar">
+      <button class="tab active" id="tabPreview" onclick="switchTab('preview')">Preview</button>
+      <button class="tab" id="tabCode" onclick="switchTab('code')">Code</button>
+      <div class="device-btns">
+        <button class="device-btn active" id="btnDesktop" onclick="setDevice('desktop')" title="Desktop">🖥</button>
+        <button class="device-btn" id="btnTablet" onclick="setDevice('tablet')" title="Tablet">📱</button>
+        <button class="device-btn" id="btnMobile" onclick="setDevice('mobile')" title="Mobile">📱</button>
+      </div>
+    </div>
+    <div class="preview-frame" id="previewFrame">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🏗️</div>
+        <h3>Nothing built yet</h3>
+        <p>Describe your app in the chat and Xynth will build it live right here</p>
+      </div>
+      <iframe id="previewIframe" style="display:none"></iframe>
+    </div>
+    <div class="code-view" id="codeView">
+      <pre id="codeContent"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Publish Modal -->
+<div class="modal-overlay" id="publishModal">
+  <div class="modal">
+    <h2>🚀 Publish Your App</h2>
+    <p>Make your creation live on the internet with a shareable link.</p>
+    <div class="price">$5 <span>/ month</span></div>
+    <ul style="color:var(--text2);font-size:14px;line-height:2;list-style:none;">
+      <li>✅ Live URL: <strong style="color:var(--text)">yourapp.xynth.app</strong></li>
+      <li>✅ Unlimited updates</li>
+      <li>✅ Up to 3 published sites</li>
+      <li>✅ SSL included</li>
+    </ul>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="goToCheckout()">Subscribe & Publish</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BACKEND = window.location.origin;
+let currentCode = '';
+let sessionId = 'build-' + Math.random().toString(36).slice(2);
+let currentDevice = 'desktop';
+let currentTab = 'preview';
+
+function addMsg(role, text) {
+  const el = document.createElement('div');
+  el.className = 'msg ' + role;
+  el.textContent = text;
+  document.getElementById('messages').appendChild(el);
+  document.getElementById('messages').scrollTop = 99999;
+  return el;
+}
+
+function sendSuggestion(text) {
+  document.getElementById('msgInput').value = text;
+  document.getElementById('suggestions').style.display = 'none';
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('suggestions').style.display = 'none';
+
+  addMsg('user', msg);
+  const botEl = addMsg('bot', '');
+  let botText = '';
+
+  try {
+    const res = await fetch(`${BACKEND}/build/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, session_id: sessionId })
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'token') {
+            botText += data.text;
+            botEl.textContent = botText.replace(/```html[\s\S]*?```/g, '[Generating code...]');
+          } else if (data.type === 'status') {
+            botEl.textContent = data.text;
+          } else if (data.type === 'preview') {
+            currentCode = data.html;
+            renderPreview(data.html);
+            botEl.textContent = '✅ Done! Your app is ready. Ask me to make changes or click Download.';
+          } else if (data.type === 'error') {
+            botEl.textContent = '❌ ' + data.text;
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    botEl.textContent = '❌ Connection error: ' + e.message;
+  }
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function renderPreview(html) {
+  document.getElementById('emptyState').style.display = 'none';
+  const iframe = document.getElementById('previewIframe');
+  iframe.style.display = 'block';
+  iframe.srcdoc = html;
+  // Update code view
+  document.getElementById('codeContent').textContent = html;
+  // Auto switch to preview tab
+  switchTab('preview');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  const preview = document.getElementById('previewFrame');
+  const code = document.getElementById('codeView');
+  if (tab === 'preview') {
+    preview.style.display = 'flex';
+    code.style.display = 'none';
+    document.getElementById('tabPreview').classList.add('active');
+    document.getElementById('tabCode').classList.remove('active');
+  } else {
+    preview.style.display = 'none';
+    code.style.display = 'block';
+    document.getElementById('tabCode').classList.add('active');
+    document.getElementById('tabPreview').classList.remove('active');
+  }
+}
+
+function setDevice(d) {
+  currentDevice = d;
+  const iframe = document.getElementById('previewIframe');
+  iframe.className = d === 'desktop' ? '' : d;
+  ['desktop','tablet','mobile'].forEach(x => {
+    document.getElementById('btn' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('active', x === d);
+  });
+}
+
+document.getElementById('downloadBtn').onclick = () => {
+  if (!currentCode) return alert('Build something first!');
+  const blob = new Blob([currentCode], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (document.getElementById('projectName').value || 'xynth-app') + '.html';
+  a.click();
+};
+
+document.getElementById('newProjectBtn').onclick = () => {
+  if (!confirm('Start a new project? Current progress will be lost.')) return;
+  currentCode = '';
+  sessionId = 'build-' + Math.random().toString(36).slice(2);
+  document.getElementById('messages').innerHTML = '<div class="msg bot">👋 Hi! Tell me what to build — a landing page, dashboard, game, portfolio, or any web app. I\'ll generate it live!</div>';
+  document.getElementById('suggestions').style.display = 'flex';
+  document.getElementById('previewIframe').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('codeContent').textContent = '';
+  document.getElementById('projectName').value = 'Untitled Project';
+};
+
+document.getElementById('publishBtn').onclick = () => {
+  document.getElementById('publishModal').classList.add('show');
+};
+
+function closeModal() {
+  document.getElementById('publishModal').classList.remove('show');
+}
+
+function goToCheckout() {
+  alert('Stripe checkout coming soon!');
+  closeModal();
+}
+
+// Close modal on overlay click
+document.getElementById('publishModal').onclick = (e) => {
+  if (e.target === e.currentTarget) closeModal();
+};
+</script>
+</body>
+</html>

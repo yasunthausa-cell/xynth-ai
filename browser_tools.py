@@ -1,14 +1,20 @@
-"""browser_tools.py — Playwright-based web search and scraping for Xynth AI.
+"""browser_tools.py — Web search and scraping tools for Xynth AI.
 
-Provides two main capabilities:
-1. search(query) — DuckDuckGo search, returns top results as text snippets
-2. scrape(url)   — Full page scrape, returns cleaned readable text
+- web_search : DuckDuckGo instant API (~200ms, no browser)
+- scrape_page: Playwright full browser for specific URL scraping
 """
 import asyncio
 import re
 from typing import Optional
 
-# ── Playwright async API ──────────────────────────────────────────────────────
+# ── Fast Search via DDGS (no browser needed) ─────────────────────────────────
+try:
+    from duckduckgo_search import DDGS
+    DDGS_AVAILABLE = True
+except ImportError:
+    DDGS_AVAILABLE = False
+
+# ── Playwright (only for URL scraping) ───────────────────────────────────────
 try:
     from playwright.async_api import async_playwright, TimeoutError as PWTimeout
     PLAYWRIGHT_AVAILABLE = True
@@ -17,62 +23,31 @@ except ImportError:
 
 
 def _clean_text(text: str, max_chars: int = 3000) -> str:
-    """Remove excess whitespace and truncate to max_chars."""
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'[ \t]{2,}', ' ', text)
     return text.strip()[:max_chars]
 
 
-async def _async_search(query: str, num_results: int = 4) -> str:
-    """Search DuckDuckGo and return top result snippets."""
-    if not PLAYWRIGHT_AVAILABLE:
-        return "[Web search unavailable: playwright not installed]"
-
-    results = []
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
-        )
-        page = await browser.new_page()
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/122 Safari/537.36"
-        })
-
-        try:
-            encoded = query.replace(" ", "+")
-            await page.goto(
-                f"https://duckduckgo.com/html/?q={encoded}",
-                wait_until="domcontentloaded",
-                timeout=20000
-            )
-            await page.wait_for_selector(".result", timeout=10000)
-            items = await page.query_selector_all(".result")
-
-            for item in items[:num_results]:
-                try:
-                    title_el = await item.query_selector(".result__title")
-                    snippet_el = await item.query_selector(".result__snippet")
-                    url_el = await item.query_selector(".result__url")
-
-                    title = (await title_el.inner_text()).strip() if title_el else ""
-                    snippet = (await snippet_el.inner_text()).strip() if snippet_el else ""
-                    url = (await url_el.inner_text()).strip() if url_el else ""
-
-                    if title or snippet:
-                        results.append(f"**{title}**\n{url}\n{snippet}")
-                except Exception:
-                    continue
-        except PWTimeout:
-            results.append("[Search timed out]")
-        except Exception as e:
-            results.append(f"[Search error: {e}]")
-        finally:
-            await browser.close()
-
-    if not results:
-        return "[No results found]"
-    return "\n\n".join(results)
+def web_search(query: str, num_results: int = 5) -> str:
+    """
+    Instant web search using DuckDuckGo API — no browser launch.
+    Returns top results as formatted text in ~200ms.
+    """
+    if not DDGS_AVAILABLE:
+        return "[Web search unavailable: duckduckgo_search not installed]"
+    try:
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=num_results):
+                title   = r.get("title", "")
+                body    = r.get("body", "")
+                href    = r.get("href", "")
+                results.append(f"**{title}**\n{href}\n{body}")
+        if not results:
+            return "[No results found]"
+        return "\n\n".join(results)
+    except Exception as e:
+        return f"[Search error: {e}]"
 
 
 async def _async_scrape(url: str) -> str:
@@ -110,21 +85,9 @@ async def _async_scrape(url: str) -> str:
             await browser.close()
 
 
-# ── Synchronous wrappers (for use in non-async Flask/Python code) ─────────────
-def web_search(query: str, num_results: int = 4) -> str:
-    """Synchronous wrapper for _async_search. Safe to call from any thread."""
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_async_search(query, num_results))
-        loop.close()
-        return result
-    except Exception as e:
-        return f"[Search failed: {e}]"
-
-
+# ── Synchronous wrapper for scraping only ────────────────────────────────────
 def scrape_page(url: str) -> str:
-    """Synchronous wrapper for _async_scrape. Safe to call from any thread."""
+    """Visit a URL with a real browser and extract its readable text."""
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
