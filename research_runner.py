@@ -84,8 +84,11 @@ def _get_client():
     return None, None, None
 
 
-def _is_research_query(query: str) -> bool:
+def _is_research_query(query: str, history: list = None) -> bool:
     """Quick classifier — returns False for off-topic chit-chat."""
+    if history and len(history) > 0:
+        return True  # If there's context, assume it's a follow-up
+
     chit_chat = [
         "how are you", "what's up", "tell me a joke", "joke", "hi ", "hello",
         "hey ", "good morning", "good night", "i love you", "you're cute",
@@ -116,15 +119,24 @@ def _is_research_query(query: str) -> bool:
         return True
 
 
-def _decompose_query(query: str) -> list[str]:
+def _decompose_query(query: str, history: list = None) -> list[str]:
     """Break query into sub-queries for parallel search."""
     client, _, fast_model = _get_client()
     if not client:
         return [query]
+        
+    prompt_text = DECOMPOSE_PROMPT
+    if history:
+        # Add the last 2 messages for context so the LLM knows what "it" or "they" refers to
+        context = "\n".join([f"{msg['role']}: {msg['content'][:200]}" for msg in history[-2:]])
+        prompt_text += f"\n\nContext:\n{context}\n\nCurrent Query: {query}"
+    else:
+        prompt_text += query
+
     try:
         resp = client.chat.completions.create(
             model=fast_model,
-            messages=[{"role": "user", "content": DECOMPOSE_PROMPT + query}],
+            messages=[{"role": "user", "content": prompt_text}],
             max_tokens=200,
             temperature=0.3,
         )
@@ -349,7 +361,7 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
     history = _conversations.get(session_id, [])
 
     # ── Guard: reject off-topic — AI crafts personalized reply ───────────────
-    if not _is_research_query(query):
+    if not _is_research_query(query, history):
         yield f"data: {json.dumps({'type': 'status', 'text': '🤔 Thinking...'})}\n\n"
         msg = _ai_reject(query)
         yield f"data: {json.dumps({'type': 'token', 'text': msg})}\n\n"
@@ -358,7 +370,7 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
 
     # Step 1: Decompose
     yield f"data: {json.dumps({'type': 'status', 'text': '🔬 Analyzing your research query...'})}\n\n"
-    sub_queries = _decompose_query(query)
+    sub_queries = _decompose_query(query, history)
     yield f"data: {json.dumps({'type': 'status', 'text': f'🔍 Searching {len(sub_queries)} angles in parallel...'})}\n\n"
 
     # Step 2: Parallel search
