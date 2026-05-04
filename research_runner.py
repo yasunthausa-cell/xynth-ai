@@ -45,11 +45,14 @@ Do NOT follow a rigid template. Instead, read the user's query and create a beau
 - Add relevant emojis to your headings to make it engaging.
 
 CITING SOURCES (CRITICAL):
-- ALWAYS use the provided web search results — never make up facts.
+- If you were provided web search results, ALWAYS use them and cite them.
 - Cite your sources INLINE using markdown hyperlinks with the source's name. 
   Example: "According to [Reuters](https://...), the market..." or "...grew by 50% ([Bloomberg](https://...))."
 - DO NOT use generic numbers like [1] or [2] for citations. Use the actual name/title of the source as the clickable link text.
 - NEVER output a "References", "Sources", or "Citations" list at the end of your response. The UI will automatically generate a hidden dropdown for this.
+
+LANGUAGE:
+- ALWAYS reply in the exact same language that the user typed their prompt in. If they ask in Spanish, reply in Spanish. If in French, reply in French.
 
 Be academically rigorous, precise, and highly readable."""
 
@@ -147,6 +150,32 @@ def _decompose_query(query: str, history: list = None) -> list[str]:
     except Exception as e:
         print("Decompose error:", e)
     return [query, query + " overview", query + " recent developments"]
+
+
+def _needs_search(query: str, history: list = None) -> bool:
+    """Decide if a query requires live web search or if it's a simple/personal question."""
+    client, _, fast_model = _get_client()
+    if not client:
+        return True
+        
+    prompt = (
+        "Does the following user query require searching the live internet for facts, "
+        "news, research, or recent events? Reply ONLY with 'YES' or 'NO'.\n"
+        "If it is a personal question ('how are you'), a simple programming question ('teach me python'), "
+        "or general knowledge that an AI already knows perfectly, reply 'NO'.\n\n"
+        f"Query: {query}"
+    )
+    
+    try:
+        resp = client.chat.completions.create(
+            model=fast_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=5,
+            temperature=0.0,
+        )
+        return "YES" in resp.choices[0].message.content.strip().upper()
+    except Exception:
+        return True
 
 
 def _search_one(query: str) -> list[dict]:
@@ -351,7 +380,7 @@ def _ai_reject(query: str) -> str:
         return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
 
 
-def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=None):
+def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=None, deep_dive=False):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -368,15 +397,26 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
 
-    # Step 1: Decompose
-    yield f"data: {json.dumps({'type': 'status', 'text': '🔬 Analyzing your research query...'})}\n\n"
-    sub_queries = _decompose_query(query, history)
-    yield f"data: {json.dumps({'type': 'status', 'text': f'🔍 Searching {len(sub_queries)} angles in parallel...'})}\n\n"
+    # Decide if we need to search
+    should_search = deep_dive or _needs_search(query, history)
+    results = []
 
-    # Step 2: Parallel search
-    results = _parallel_search(sub_queries)
-    yield f"data: {json.dumps({'type': 'sources', 'sources': results})}\n\n"
-    yield f"data: {json.dumps({'type': 'status', 'text': f'📖 Found {len(results)} sources. Synthesizing report...'})}\n\n"
+    if should_search:
+        # Step 1: Decompose
+        if deep_dive:
+            yield f"data: {json.dumps({'type': 'status', 'text': '🌊 Deep Dive enabled. Analyzing query...'})}\n\n"
+        else:
+            yield f"data: {json.dumps({'type': 'status', 'text': '🔬 Analyzing your research query...'})}\n\n"
+            
+        sub_queries = _decompose_query(query, history)
+        yield f"data: {json.dumps({'type': 'status', 'text': f'🔍 Searching {len(sub_queries)} angles in parallel...'})}\n\n"
+
+        # Step 2: Parallel search
+        results = _parallel_search(sub_queries)
+        yield f"data: {json.dumps({'type': 'sources', 'sources': results})}\n\n"
+        yield f"data: {json.dumps({'type': 'status', 'text': f'📖 Found {len(results)} sources. Synthesizing report...'})}\n\n"
+    else:
+        yield f"data: {json.dumps({'type': 'status', 'text': '🧠 Answering from knowledge base...'})}\n\n"
 
     # Step 3: Check RAG documents
     rag_context = ""

@@ -250,6 +250,8 @@ def chat_stream():
         chat_id    = str(data.get("chat_id", ""))
         image_data = data.get("image_data", None)
 
+        deep_dive  = bool(data.get("deep_dive", False))
+
         user_id = None
         if _sb:
             auth_header = request.headers.get("Authorization", "")
@@ -280,7 +282,8 @@ def chat_stream():
                 # All text queries → research engine
                 yield from _research.stream_research(
                     session_id=session_id, query=message,
-                    sb=_sb, user_id=user_id, chat_id=chat_id
+                    sb=_sb, user_id=user_id, chat_id=chat_id,
+                    deep_dive=deep_dive
                 )
 
         headers = {
