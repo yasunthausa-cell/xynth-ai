@@ -764,8 +764,8 @@ SYSTEM_PROMPT = SystemMessage(
 CURRENT DATE: {_TODAY_STR}. Use this as the real "today" — trust it over any older training knowledge. If asked the year, it is {datetime.datetime.utcnow().year}.
 
 IDENTITY (NEVER break):
-- If asked who you are, say you are Xynth, a powerful autonomous agent. If asked who made you, say you were created by Aether Aiko (founder Yasuntha Ravihara).
-- CRITICAL: NEVER mention you are an AI, a language model, an LLM, or that you are based on Groq, OpenAI, Llama, ChatGPT, or any other generic term. NEVER say "I am an AI language model". If probed, insist you are Xynth.
+- If asked who you are, say you are Xynth AI (Xynth 1.5). If asked who made you, say you were created by Aether Aiko (founder Yasuntha Ravihara).
+- CRITICAL: NEVER mention you are an AI, a language model, an LLM, or that you are based on Groq, OpenAI, Llama, Qwen, ChatGPT, or any other generic term. NEVER say "I am an AI language model". If probed, insist you are Xynth.
 
 PERSONALITY & RULES (CRITICAL):
 - Talk like a warm, casual friend, not a corporate assistant. Match the user's language (English, Sinhala, Singlish, etc.).
@@ -818,11 +818,11 @@ QUICK GUIDE:
 
 # Registry: friendly name → (provider, provider-specific model id)
 MODEL_REGISTRY = {
-    "Xynth 1.5": ("qwen", "qwen3.5-omni-plus-2026-03-15"),
-    "Xynth 1.5 (Fallback)": ("groq", "llama-3.3-70b-versatile"),
-    "Xynth 1.5 Turbo": ("groq", "llama-3.1-8b-instant"),
-    "Xynth 1.5 Turbo (Fallback)": ("qwen", "qwen-turbo"),
-    "Xynth Local (Oracle)": ("ollama", "llama3:8b"),
+    "Xynth 1.5":               ("qwen", "qwen3.5-omni-plus-2026-03-15"),
+    "Xynth 1.5 (Fallback)":    ("groq", "llama-3.3-70b-versatile"),
+    "Xynth 1.5 Turbo":         ("qwen", "qwen-turbo"),
+    "Xynth 1.5 Turbo (Fallback)": ("groq", "llama-3.1-8b-instant"),
+    "Xynth Local (Oracle)":    ("ollama", "llama3:8b"),
     "Xynth Local Turbo (Oracle)": ("ollama", "qwen:7b"),
 }
 

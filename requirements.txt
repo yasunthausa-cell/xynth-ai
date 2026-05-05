@@ -19,3 +19,5 @@ openai
 pypdf
 pdfplumber
 fpdf2
+flask-sock
+websocket-client
