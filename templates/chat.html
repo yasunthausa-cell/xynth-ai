@@ -208,22 +208,22 @@
             font-size: 24px; cursor: pointer; display: none;
         }
         .model-selector {
-            background: var(--surface);
+            background: transparent;
             border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 8px 16px;
-            border-radius: 20px;
+            color: var(--text-secondary);
+            border-radius: 12px;
+            padding: 6px 32px 6px 12px;
             font-weight: 500;
-            font-size: 14px;
+            font-size: 12px;
             cursor: pointer;
             outline: none;
             appearance: none;
             -webkit-appearance: none;
-            padding-right: 32px;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
             background-repeat: no-repeat;
             background-position: right 12px top 50%;
             background-size: 10px auto;
+            transition: all 0.2s;
         }
 
         /* --- Landing View --- */
@@ -516,10 +516,6 @@
     <div class="main">
         <div class="top-nav">
             <button class="toggle-sidebar" id="toggleSidebarBtn">☰</button>
-            <select id="modelSelector" class="model-selector">
-                <option value="Xynth 1.5">Xynth 1.5</option>
-                <option value="Xynth 1.5 Turbo">Xynth 1.5 Turbo</option>
-            </select>
         </div>
 
         <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column;">
@@ -552,7 +548,11 @@
                     <svg id="stopIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
                 </button>
             </div>
-            <div class="input-actions" style="display: flex; margin-top: 8px;">
+            <div class="input-actions" style="display: flex; gap: 8px; margin-top: 8px;">
+                <select id="modelSelector" class="model-selector">
+                    <option value="Xynth 1.5">Xynth 1.5</option>
+                    <option value="Xynth 1.5 Turbo">Xynth 1.5 Turbo</option>
+                </select>
                 <button id="deepDiveBtn" class="deep-dive-btn">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 12a4 4 0 0 1-8 0"></path></svg>
                     <span id="deepDiveText">Deep Dive</span>
@@ -788,14 +788,24 @@
             voiceBtn.style.display = 'none';
         }
 
-        function appendMessage(role, text) {
+        function appendMessage(role, text, imgSrc=null) {
             const msgDiv = document.createElement('div');
             msgDiv.className = `message ${role}`;
             
             const bubble = document.createElement('div');
             bubble.className = 'bubble';
+            
+            if (imgSrc) {
+                const img = document.createElement('img');
+                img.src = imgSrc;
+                img.style.cssText = 'max-width: 250px; border-radius: 8px; margin-bottom: 8px; display: block; border: 1px solid var(--border);';
+                bubble.appendChild(img);
+            }
+
             if (role === 'bot') {
-                bubble.innerHTML = text ? marked.parse(text) : '';
+                const textDiv = document.createElement('div');
+                textDiv.innerHTML = text ? marked.parse(text) : '';
+                bubble.appendChild(textDiv);
                 msgDiv.appendChild(bubble);
                 
                 // Add actions for bot
@@ -826,11 +836,32 @@
                     }
                 };
                 
+                const pdfBtn = document.createElement('button');
+                pdfBtn.className = 'action-btn';
+                pdfBtn.title = "Save as PDF";
+                pdfBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>';
+                pdfBtn.onclick = () => {
+                    const printWindow = window.open('', '_blank');
+                    printWindow.document.write(`
+                        <html><head><title>Xynth Research</title>
+                        <style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;line-height:1.6;padding:40px;color:#000;max-width:800px;margin:auto} a{color:#10b981;text-decoration:none} img{max-width:100%;border-radius:8px}</style>
+                        </head><body>
+                        <h1>Xynth Research Document</h1>
+                        ${textDiv.innerHTML}
+                        <script>setTimeout(()=>{window.print(); window.close();}, 500);</script>
+                        </body></html>
+                    `);
+                    printWindow.document.close();
+                };
+                
                 actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(pdfBtn);
                 actionsDiv.appendChild(regenBtn);
-                msgDiv.appendChild(actionsDiv);
+                bubble.appendChild(actionsDiv);
             } else {
-                bubble.textContent = text;
+                const textDiv = document.createElement('div');
+                textDiv.textContent = text;
+                bubble.appendChild(textDiv);
                 msgDiv.appendChild(bubble);
                 lastUserMessage = text; // Track last user message for regeneration
             }
@@ -866,9 +897,11 @@
             messageInput.style.height = 'auto';
             setGenerationUI();
 
-            appendMessage('user', text);
+            const payloadImageData = currentImageData;
+
+            appendMessage('user', text, payloadImageData);
             const botBubble = appendMessage('bot', '');
-            botBubble.innerHTML = '<span style="opacity:0.5">Thinking...</span>';
+            botBubble.lastElementChild.innerHTML = '<span style="opacity:0.5">Thinking...</span>';
 
             const model = modelSelector.value;
             abortController = new AbortController();
@@ -920,11 +953,11 @@
                                 const data = JSON.parse(dataStr);
                                 if (data.type === 'token') {
                                     fullText += data.text;
-                                    botBubble.innerHTML = marked.parse(fullText);
+                                    botBubble.lastElementChild.innerHTML = marked.parse(fullText);
                                     chatView.scrollTop = chatView.scrollHeight;
                                 } else if (data.type === 'status') {
                                     if (!fullText) {
-                                        botBubble.innerHTML = `<div style="display:flex;align-items:center;gap:8px;opacity:0.7;font-style:italic;font-size:13px">
+                                        botBubble.lastElementChild.innerHTML = `<div style="display:flex;align-items:center;gap:8px;opacity:0.7;font-style:italic;font-size:13px">
                                             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite"></span>
                                             ${data.text}</div>`;
                                     }
@@ -959,9 +992,9 @@
                                 } else if (data.type === 'limit') {
                                     showLimitModal(data.unlock_utc, modelSelector.value);
                                     if (modelSelector.value === 'Xynth 1.5') modelSelector.value = 'Xynth 1.5 Turbo';
-                                    if (!fullText) botBubble.innerHTML = '<span style="color:#ef4444">Message blocked due to daily limit.</span>';
+                                    if (!fullText) botBubble.lastElementChild.innerHTML = '<span style="color:#ef4444">Message blocked due to daily limit.</span>';
                                 } else if (data.type === 'error') {
-                                    botBubble.innerHTML += `<br><span style="color:#ef4444">Error: ${data.text}</span>`;
+                                    botBubble.lastElementChild.innerHTML += `<br><span style="color:#ef4444">Error: ${data.text}</span>`;
                                 } else if (data.type === 'done' && botBubble.dataset.sources) {
                                     // Append collapsible sources section
                                     try {
@@ -987,10 +1020,10 @@
             } catch (err) {
                 if (err.name === 'AbortError') {
                     // Stopped by user, just leave text as is
-                    if (fullText) botBubble.innerHTML = marked.parse(fullText);
+                    if (fullText) botBubble.lastElementChild.innerHTML = marked.parse(fullText);
                 } else {
                     console.error(err);
-                    botBubble.innerHTML = `<span style="color:#ef4444">Connection failed. Please try again.</span>`;
+                    botBubble.lastElementChild.innerHTML = `<span style="color:#ef4444">Connection failed. Please try again.</span>`;
                 }
             }
             stopGenerationUI();
