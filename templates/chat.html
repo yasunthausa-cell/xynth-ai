@@ -178,12 +178,184 @@
             color: var(--text-primary);
         }
         .close-sidebar-btn {
-            display: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background: none;
             border: none;
             color: var(--text-secondary);
             font-size: 20px;
             cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            transition: background 0.15s;
+        }
+        .close-sidebar-btn:hover { background: var(--surface-hover); }
+
+        /* Sidebar auth buttons (guest only) */
+        .sidebar-auth-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .sidebar-auth-btn {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: var(--font);
+        }
+        .sidebar-login-btn {
+            background: var(--accent);
+            color: white;
+        }
+        .sidebar-login-btn:hover { background: var(--accent-hover); }
+        .sidebar-signup-btn {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border) !important;
+        }
+        .sidebar-signup-btn:hover { background: var(--surface-hover); }
+
+        /* Guest warning toast */
+        .guest-toast {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #1a1a2e;
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 12px 20px;
+            max-width: 420px;
+            width: calc(100% - 32px);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            box-shadow: 0 4px 24px rgba(99,102,241,0.2);
+        }
+        .guest-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+        .guest-toast-icon { font-size: 20px; flex-shrink: 0; }
+        .guest-toast-body { flex: 1; }
+        .guest-toast-body p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+        .guest-toast-body strong { color: var(--text-primary); font-size: 14px; display: block; margin-bottom: 2px; }
+        .guest-toast-btns { display: flex; gap: 6px; margin-top: 8px; }
+        .guest-toast-btn {
+            padding: 5px 12px; border-radius: 6px; font-size: 12px;
+            font-weight: 600; cursor: pointer; border: none; font-family: var(--font);
+        }
+        .guest-toast-btn.primary { background: var(--accent); color: white; }
+        .guest-toast-btn.primary:hover { background: var(--accent-hover); }
+        .guest-toast-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+
+        /* Announcement popup */
+        .announcement-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .announcement-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .announcement-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 480px;
+            overflow: hidden;
+            transform: translateY(20px) scale(0.97);
+            transition: transform 0.3s;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+        }
+        .announcement-overlay.show .announcement-card {
+            transform: translateY(0) scale(1);
+        }
+        .announcement-banner {
+            width: 100%;
+            max-height: 240px;
+            object-fit: cover;
+            display: block;
+        }
+        .announcement-body {
+            padding: 24px;
+        }
+        .announcement-tag {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+        .announcement-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+        .announcement-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .announcement-footer {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .announcement-close-btn {
+            flex: 1;
+            padding: 11px;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: var(--font);
+            transition: background 0.2s;
+        }
+        .announcement-close-btn:hover { background: var(--accent-hover); }
+        .announcement-dismiss {
+            padding: 11px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            font-family: var(--font);
+            white-space: nowrap;
         }
 
         /* --- Main Area --- */
@@ -475,6 +647,7 @@
             .toggle-sidebar { display: block; }
             .landing-view h1 { font-size: 24px; }
             .bubble { max-width: 90%; }
+            .guest-toast { bottom: 100px; }
         }
     </style>
 </head>
@@ -515,6 +688,35 @@
         </div>
     </div>
 
+    <!-- Announcement Popup -->
+    <div id="announcementOverlay" class="announcement-overlay">
+        <div class="announcement-card">
+            <img id="announcementImage" class="announcement-banner" src="" alt="" style="display:none;">
+            <div class="announcement-body">
+                <span class="announcement-tag" id="announcementTag">Update</span>
+                <div class="announcement-title" id="announcementTitle"></div>
+                <div class="announcement-text" id="announcementText"></div>
+                <div class="announcement-footer">
+                    <button class="announcement-close-btn" id="announcementCloseBtn">Got it!</button>
+                    <button class="announcement-dismiss" id="announcementDismissBtn">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guest Warning Toast -->
+    <div id="guestToast" class="guest-toast">
+        <div class="guest-toast-icon">💬</div>
+        <div class="guest-toast-body">
+            <strong>You're chatting as a guest</strong>
+            <p>Chats aren't saved and you have lower limits. Sign in for more.</p>
+            <div class="guest-toast-btns">
+                <button class="guest-toast-btn primary" id="toastLoginBtn">Log In</button>
+                <button class="guest-toast-btn secondary" id="toastDismissBtn">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <div id="sidebar" class="sidebar">
         <div class="brand" style="display:flex; justify-content:space-between; align-items:center;">
@@ -536,7 +738,14 @@
         </div>
 
         <div class="spacer"></div>
-        <div class="user-profile" id="userProfile">
+
+        <!-- Shown to guests only -->
+        <div class="sidebar-auth-section" id="sidebarAuthSection">
+            <button class="sidebar-auth-btn sidebar-login-btn" id="sidebarLoginBtn">Log In</button>
+            <button class="sidebar-auth-btn sidebar-signup-btn" id="sidebarSignupBtn">Sign Up</button>
+        </div>
+
+        <div class="user-profile" id="userProfile" style="display:none;">
             Not logged in
         </div>
         <button class="nav-btn" id="logoutBtn" style="color: #ef4444; display: none; margin-top: 8px;">Sign Out</button>
@@ -565,18 +774,14 @@
                 <button class="remove-image-btn" id="removeImageBtn">✕</button>
             </div>
             <div class="input-container">
-                <textarea id="messageInput" placeholder="Research anything... ask a question, get cited answers" rows="1" style="padding: 10px 8px; margin-bottom: 8px;"></textarea>
+                <textarea id="messageInput" placeholder="Research anything..." rows="1" style="padding: 10px 8px; margin-bottom: 8px;"></textarea>
                 <div class="input-row-actions" style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <button class="icon-btn" id="addFileBtn" title="Add File">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
-                        <select id="modelSelector" class="model-selector">
-                            <option value="Xynth 1.5">Xynth 1.5</option>
-                            <option value="Xynth 1.5 Turbo">Xynth 1.5 Turbo</option>
-                        </select>
-                        <button id="deepDiveBtn" class="deep-dive-btn">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 12a4 4 0 0 1-8 0"></path></svg>
+                        <button id="deepDiveBtn" class="deep-dive-btn" style="padding: 8px 16px; font-size: 13px; border-radius: 14px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 12a4 4 0 0 1-8 0"></path></svg>
                             <span id="deepDiveText">Deep Dive</span>
                         </button>
                     </div>
@@ -614,7 +819,7 @@
         const sendBtn = document.getElementById('sendBtn');
         const sendIcon = document.getElementById('sendIcon');
         const stopIcon = document.getElementById('stopIcon');
-        const modelSelector = document.getElementById('modelSelector');
+        const modelSelector = { value: 'Xynth 1.5' }; // model selector removed from UI
         const limitModal = document.getElementById('limitModal');
 
         let currentUser = null;
@@ -633,18 +838,47 @@
                 currentUser = session.user;
                 currentToken = session.access_token;
                 authModal.classList.add('hidden');
-                userProfile.textContent = currentUser.email;
+                document.getElementById('userProfile').textContent = currentUser.email;
+                document.getElementById('userProfile').style.display = 'block';
                 logoutBtn.style.display = 'block';
+                document.getElementById('sidebarAuthSection').style.display = 'none';
                 loadChatHistory();
             } else {
                 currentUser = null;
                 currentToken = "";
-                // TEMPORARILY DISABLED LOGIN SCREEN
-                authModal.classList.add('hidden'); 
-                userProfile.textContent = 'Guest User';
+                authModal.classList.add('hidden');
+                document.getElementById('userProfile').style.display = 'none';
                 logoutBtn.style.display = 'none';
+                document.getElementById('sidebarAuthSection').style.display = 'flex';
             }
         });
+
+        // Sidebar auth buttons open the auth modal
+        document.getElementById('sidebarLoginBtn').addEventListener('click', () => {
+            document.getElementById('authModal').classList.remove('hidden');
+            document.getElementById('sidebar').classList.remove('open');
+        });
+        document.getElementById('sidebarSignupBtn').addEventListener('click', () => {
+            document.getElementById('authModal').classList.remove('hidden');
+            document.getElementById('sidebar').classList.remove('open');
+        });
+
+        // Guest toast
+        let guestToastShown = false;
+        const guestToast = document.getElementById('guestToast');
+        document.getElementById('toastLoginBtn').addEventListener('click', () => {
+            guestToast.classList.remove('show');
+            document.getElementById('authModal').classList.remove('hidden');
+        });
+        document.getElementById('toastDismissBtn').addEventListener('click', () => {
+            guestToast.classList.remove('show');
+            guestToastShown = true; // don't show again this session
+        });
+        function showGuestToast() {
+            if (currentUser || guestToastShown) return;
+            guestToast.classList.add('show');
+            setTimeout(() => guestToast.classList.remove('show'), 7000);
+        }
 
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const email = document.getElementById('emailInput').value;
@@ -702,9 +936,7 @@
             if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
         });
 
-        document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
-            document.getElementById('sidebar').classList.toggle('open');
-        });
+        // second toggle-sidebar listener removed (duplicate)
         document.getElementById('closeSidebarBtn').addEventListener('click', () => {
             document.getElementById('sidebar').classList.remove('open');
         });
@@ -905,6 +1137,9 @@
         async function send() {
             const text = messageInput.value.trim();
             if (!text) return;
+
+            // Show guest warning on first message
+            showGuestToast();
             
             document.getElementById('suggestions').style.display = 'none';
 
@@ -1083,6 +1318,49 @@
                 });
             });
         }
+
+        // ── Announcement Popup System ──────────────────────────────────────
+        (async function loadAnnouncement() {
+            try {
+                const res = await fetch('/api/announcement');
+                const data = await res.json();
+                if (!data || !data.active) return;
+
+                // Check if already dismissed this session
+                const dismissedKey = 'xynth_dismissed_announcement_' + (data.id || data.created_at || '');
+                if (sessionStorage.getItem(dismissedKey)) return;
+
+                const overlay = document.getElementById('announcementOverlay');
+                const tag = document.getElementById('announcementTag');
+                const title = document.getElementById('announcementTitle');
+                const text = document.getElementById('announcementText');
+                const img = document.getElementById('announcementImage');
+
+                if (data.tag) tag.textContent = data.tag;
+                if (data.title) title.textContent = data.title;
+                if (data.message) text.textContent = data.message;
+                if (data.image_url) {
+                    img.src = data.image_url;
+                    img.style.display = 'block';
+                }
+
+                // Delay slightly for page load feel
+                setTimeout(() => overlay.classList.add('show'), 600);
+
+                function dismiss() {
+                    overlay.classList.remove('show');
+                    sessionStorage.setItem(dismissedKey, '1');
+                }
+
+                document.getElementById('announcementCloseBtn').addEventListener('click', dismiss);
+                document.getElementById('announcementDismissBtn').addEventListener('click', dismiss);
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) dismiss();
+                });
+            } catch(e) {
+                // Silently fail — announcements are non-critical
+            }
+        })();
     </script>
 </body>
 </html>

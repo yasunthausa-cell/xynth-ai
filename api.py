@@ -429,7 +429,7 @@ def get_chat_messages(chat_id):
 
 @app.route("/api/announcement", methods=["GET"])
 def get_announcement():
-    """Endpoint for mobile app to fetch OTA popups/announcements from Supabase."""
+    """Fetch the latest active announcement/popup for the web app."""
     if _sb:
         try:
             res = _sb.table("announcements").select("*").eq("active", True).order("created_at", desc=True).limit(1).execute()
@@ -438,6 +438,75 @@ def get_announcement():
         except Exception as e:
             print("Announcement fetch error:", e)
     return jsonify({"active": False})
+
+
+@app.route("/admin/announcement", methods=["POST"])
+def push_announcement():
+    """Push a global popup announcement to all users.
+    Protected by ADMIN_SECRET env var.
+    
+    Body (JSON):
+        secret   : str  — must match ADMIN_SECRET env var
+        title    : str  — popup headline (required)
+        message  : str  — body text (required)
+        tag      : str  — badge label, e.g. "New Feature" (optional, default "Update")
+        image_url: str  — optional banner image URL
+        active   : bool — set False to deactivate a previous announcement (default True)
+    """
+    if not _sb:
+        return jsonify({"ok": False, "error": "Supabase not configured"}), 503
+
+    data = request.get_json(silent=True) or {}
+    secret = (data.get("secret") or "").strip()
+    admin_secret = os.environ.get("ADMIN_SECRET", "")
+
+    if not admin_secret or secret != admin_secret:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    title    = (data.get("title") or "").strip()
+    message  = (data.get("message") or "").strip()
+    tag      = (data.get("tag") or "Update").strip()
+    image_url = (data.get("image_url") or "").strip() or None
+    active   = bool(data.get("active", True))
+
+    if not title or not message:
+        return jsonify({"ok": False, "error": "title and message are required"}), 400
+
+    try:
+        # Deactivate all previous announcements first
+        _sb.table("announcements").update({"active": False}).eq("active", True).execute()
+        # Insert the new one
+        row = {
+            "title":     title,
+            "message":   message,
+            "tag":       tag,
+            "image_url": image_url,
+            "active":    active,
+        }
+        res = _sb.table("announcements").insert(row).execute()
+        return jsonify({"ok": True, "announcement": res.data[0] if res.data else row})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/admin/announcement/clear", methods=["POST"])
+def clear_announcements():
+    """Deactivate all active announcements (removes the popup for all users)."""
+    if not _sb:
+        return jsonify({"ok": False, "error": "Supabase not configured"}), 503
+
+    data = request.get_json(silent=True) or {}
+    secret = (data.get("secret") or "").strip()
+    admin_secret = os.environ.get("ADMIN_SECRET", "")
+
+    if not admin_secret or secret != admin_secret:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    try:
+        _sb.table("announcements").update({"active": False}).eq("active", True).execute()
+        return jsonify({"ok": True, "message": "All announcements deactivated."})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/reset", methods=["POST"])
