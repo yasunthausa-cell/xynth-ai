@@ -470,14 +470,26 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
         _conversations[session_id] = entry[-20:]
 
     # Save to Supabase chat if logged in
-    if sb and user_id and chat_id:
-        try:
-            sb.table("messages").insert([
-                {"chat_id": chat_id, "role": "user", "content": query},
-                {"chat_id": chat_id, "role": "assistant", "content": full_response},
-            ]).execute()
-        except Exception as e:
-            print("Save error:", e)
+    if sb and user_id:
+        if not chat_id:
+            try:
+                title = query[:40] + ("..." if len(query) > 40 else "")
+                res = sb.table("chats").insert({"user_id": user_id, "title": title}).execute()
+                if res.data:
+                    chat_id = res.data[0]["id"]
+                    # Notify frontend of new chat ID so it reloads the history dropdown
+                    yield f"data: {json.dumps({'type': 'chat_id', 'id': chat_id})}\n\n"
+            except Exception as e:
+                print("Create chat error:", e)
+
+        if chat_id:
+            try:
+                sb.table("messages").insert([
+                    {"chat_id": chat_id, "role": "user", "content": query},
+                    {"chat_id": chat_id, "role": "assistant", "content": full_response},
+                ]).execute()
+            except Exception as e:
+                print("Save error:", e)
 
     # ── Step 5: Image search (if requested or visual topic) ──────────────────
     if _wants_images(query):
