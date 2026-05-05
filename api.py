@@ -226,6 +226,12 @@ def serve_manifest():
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
     return send_from_directory(static_dir, "manifest.json")
 
+@app.route("/sw.js", methods=["GET"])
+def serve_sw():
+    """Serve the Service Worker."""
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    return send_from_directory(static_dir, "sw.js")
+
 
 @app.route("/chat", methods=["POST"])
 def chat():

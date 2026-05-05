@@ -57,6 +57,7 @@ LANGUAGE:
 Be academically rigorous, precise, and highly readable."""
 
 DECOMPOSE_PROMPT = """Break this research query into 3 focused sub-queries for comprehensive research.
+If the user's query contains typos, misspellings, or bad grammar, automatically correct them in your mind before creating the sub-queries.
 Return ONLY a JSON array of 3 strings. Example: ["sub-query 1", "sub-query 2", "sub-query 3"]
 Query: """
 
