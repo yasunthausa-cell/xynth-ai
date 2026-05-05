@@ -22,10 +22,10 @@ except Exception:
 
 # ── Models ────────────────────────────────────────────────────────────────────
 MODELS = {
-    "Xynth 1.5":       "qwen-max",          # Alibaba's best model (shown in your DashScope)
-    "Xynth 1.5 Turbo": "qwen-turbo-latest", # Fastest lightweight model
+    "Xynth 1.5":       "qwen3.5-omni-plus",          # State-of-the-art multimodal model
+    "Xynth 1.5 Turbo": "qwen3-omni-flash",           # Fastest lightweight model
 }
-VISION_MODEL = "qwen2.5-vl-72b-instruct"   # 72B vision model (shown in your DashScope)
+VISION_MODEL = "qwen3.5-omni-plus"   # 3.5 Omni natively supports vision processing
 
 DAILY_LIMITS = {"Xynth 1.5": 9999, "Xynth 1.5 Turbo": 9999}
 
@@ -83,7 +83,7 @@ def _generate_chat_title(message: str) -> str:
         return message[:40] + ("..." if len(message) > 40 else "")
     try:
         resp = _client.chat.completions.create(
-            model="qwen-turbo-latest",
+            model="qwen3-omni-flash",
             messages=[
                 {"role": "system", "content": "Generate a very short chat title (max 5 words, no quotes, no punctuation). Reply with ONLY the title."},
                 {"role": "user", "content": message}
@@ -154,7 +154,8 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5",
         history = _conversations.get(session_id, [])
 
     full_response = ""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+    dynamic_system_prompt = SYSTEM_PROMPT + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
+    messages = [{"role": "system", "content": dynamic_system_prompt}] + history
 
     if image_data:
         # ── Vision mode ───────────────────────────────────────────────────────

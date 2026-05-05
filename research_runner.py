@@ -31,15 +31,16 @@ try:
 except Exception:
     pass
 
-PRIMARY_MODEL = "qwen-max"
+PRIMARY_MODEL = "qwen3.5-omni-plus"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
-FAST_MODEL    = "qwen-turbo-latest"
+FAST_MODEL    = "qwen3-omni-flash"
 
 RESEARCH_SYSTEM_PROMPT = """You are Xynth Research, an advanced AI research assistant for students and professionals.
 
 STRUCTURE YOUR RESPONSE DYNAMICALLY:
 Do NOT follow a rigid template. Instead, read the user's query and create a beautifully structured, highly readable response using custom headings (##) that make sense for that specific topic. 
 - Use bold text, bullet points, and paragraphs to make it scannable.
+- DO NOT use markdown tables unless explicitly asked. Tables are hard to read on mobile. Use bullet points instead.
 - If it's a coding question, provide clear explanations and code blocks.
 - If it's news, structure it chronologically or by theme.
 - Add relevant emojis to your headings to make it engaging.
@@ -129,13 +130,13 @@ def _decompose_query(query: str, history: list = None) -> list[str]:
     if not client:
         return [query]
         
-    prompt_text = DECOMPOSE_PROMPT
+    prompt_text = DECOMPOSE_PROMPT + f"\nCRITICAL: The current year is {datetime.datetime.now().year}. If the query is about current events, news, or time-sensitive topics, implicitly append '{datetime.datetime.now().year}' to your sub-queries to get the latest information."
     if history:
         # Add the last 2 messages for context so the LLM knows what "it" or "they" refers to
         context = "\n".join([f"{msg['role']}: {msg['content'][:200]}" for msg in history[-2:]])
         prompt_text += f"\n\nContext:\n{context}\n\nCurrent Query: {query}"
     else:
-        prompt_text += query
+        prompt_text += "\n\nCurrent Query: " + query
 
     try:
         resp = client.chat.completions.create(
@@ -439,7 +440,8 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
         + f"\n\nResearch query: {query}"
     )
 
-    messages = [{"role": "system", "content": RESEARCH_SYSTEM_PROMPT}]
+    dynamic_system_prompt = RESEARCH_SYSTEM_PROMPT + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
+    messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
     messages.append({"role": "user", "content": augmented})
 
