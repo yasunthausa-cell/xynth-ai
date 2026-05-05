@@ -427,6 +427,29 @@ def get_chat_messages(chat_id):
         print("GET /chats/<id> error:", e)
         return jsonify([])
 
+@app.route("/chats/<chat_id>", methods=["DELETE"])
+def delete_chat(chat_id):
+    """Delete a chat and all its messages (ownership verified)."""
+    if not _sb: return jsonify({"ok": False}), 503
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+    token = auth_header.split(" ")[1]
+    try:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user:
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        # Verify ownership before deleting
+        chat_res = _sb.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        if not chat_res.data:
+            return jsonify({"ok": False, "error": "Not found"}), 404
+        _sb.table("messages").delete().eq("chat_id", chat_id).execute()
+        _sb.table("chats").delete().eq("id", chat_id).execute()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print("DELETE /chats/<id> error:", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route("/api/announcement", methods=["GET"])
 def get_announcement():
     """Fetch the latest active announcement/popup for the web app."""

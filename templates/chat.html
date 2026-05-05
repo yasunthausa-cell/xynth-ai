@@ -19,6 +19,9 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/static/voice.js"></script>
+    <!-- Syntax highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
     
     <style>
         :root {
@@ -511,9 +514,93 @@
         .bubble li { margin-bottom: 8px; line-height: 1.65; font-size: 15px; }
         .bubble a { color: #10b981; text-decoration: none; font-weight: 500; }
         .bubble a:hover { text-decoration: underline; }
-        .bubble pre { background: var(--surface); padding: 12px; border-radius: 8px; overflow-x: auto; margin-bottom: 12px; border: 1px solid var(--border); }
-        .bubble code { font-family: monospace; background: var(--surface); padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
-        .bubble pre code { padding: 0; border: none; }
+        .bubble pre { position: relative; background: #0d1117; padding: 0; border-radius: 10px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--border); }
+        .bubble pre .code-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: #161b22; border-bottom: 1px solid #30363d; font-size: 12px; color: #8b949e; font-family: monospace; }
+        .bubble pre .copy-code-btn { background: transparent; border: 1px solid #30363d; color: #8b949e; padding: 3px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; transition: all 0.15s; font-family: var(--font); }
+        .bubble pre .copy-code-btn:hover { background: #21262d; color: #e6edf3; }
+        .bubble pre code { display: block; padding: 14px; overflow-x: auto; font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 13px; line-height: 1.6; }
+        .bubble code:not(pre code) { font-family: monospace; background: rgba(99,102,241,0.12); color: #a5b4fc; padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
+        /* Scroll to bottom btn */
+        .scroll-btn {
+            position: fixed;
+            bottom: 130px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 20px;
+            padding: 7px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.25s, transform 0.25s;
+            pointer-events: none;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+            font-family: var(--font);
+        }
+        .scroll-btn.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+        .scroll-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+        /* Greeting */
+        .greeting-text {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .greeting-sub {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+        /* History group labels */
+        .history-group-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            padding: 10px 12px 3px;
+            opacity: 0.6;
+        }
+        .history-item-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .history-item {
+            flex: 1;
+            padding: 8px 32px 8px 12px;
+        }
+        .history-delete-btn {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            opacity: 0;
+            padding: 3px 5px;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: opacity 0.15s, color 0.15s;
+            line-height: 1;
+        }
+        .history-item-wrap:hover .history-delete-btn { opacity: 1; }
+        .history-delete-btn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
 
         /* --- Suggestions --- */
         .suggestions {
@@ -757,8 +844,18 @@
             <button class="toggle-sidebar" id="toggleSidebarBtn">☰</button>
         </div>
 
+        <!-- Scroll to bottom -->
+        <button class="scroll-btn" id="scrollBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            Scroll to bottom
+        </button>
+
         <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column;">
-            <div class="spacer"></div> <!-- Pushes suggestions down initially -->
+            <div class="spacer"></div>
+            <div id="landingGreeting" style="text-align:center; padding: 0 16px 8px;">
+                <div class="greeting-text" id="greetingText">Good morning.</div>
+                <div class="greeting-sub">How can Xynth help you today?</div>
+            </div>
             <div id="suggestions" class="suggestions">
                 <button class="suggestion-chip">⚛️ How does quantum computing threaten encryption?</button>
                 <button class="suggestion-chip">🌍 Latest news in artificial intelligence 2025</button>
@@ -933,6 +1030,7 @@
             currentChatId = "";
             messagesContainer.innerHTML = '';
             document.getElementById('suggestions').style.display = 'flex';
+            document.getElementById('landingGreeting').style.display = 'block';
             if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
         });
 
@@ -968,7 +1066,7 @@
             });
         });
 
-        // History Logic
+        // History Logic — grouped by date with delete
         async function loadChatHistory() {
             if (!currentToken) return;
             try {
@@ -976,13 +1074,55 @@
                 const chats = await res.json();
                 const chatList = document.getElementById('chatList');
                 chatList.innerHTML = '';
+                if (!chats.length) return;
+
+                const now = new Date();
+                const groups = { 'Today': [], 'Yesterday': [], 'Last 7 days': [], 'Older': [] };
                 chats.forEach(chat => {
-                    const btn = document.createElement('button');
-                    btn.className = 'history-item';
-                    btn.textContent = chat.title;
-                    btn.onclick = () => loadChat(chat.id, btn);
-                    chatList.appendChild(btn);
+                    const d = new Date(chat.created_at);
+                    const diffDays = Math.floor((now - d) / 86400000);
+                    if (diffDays < 1) groups['Today'].push(chat);
+                    else if (diffDays < 2) groups['Yesterday'].push(chat);
+                    else if (diffDays < 7) groups['Last 7 days'].push(chat);
+                    else groups['Older'].push(chat);
                 });
+
+                for (const [label, items] of Object.entries(groups)) {
+                    if (!items.length) continue;
+                    const lbl = document.createElement('div');
+                    lbl.className = 'history-group-label';
+                    lbl.textContent = label;
+                    chatList.appendChild(lbl);
+                    items.forEach(chat => {
+                        const wrap = document.createElement('div');
+                        wrap.className = 'history-item-wrap';
+                        const btn = document.createElement('button');
+                        btn.className = 'history-item';
+                        btn.textContent = chat.title;
+                        btn.onclick = () => loadChat(chat.id, btn);
+                        const del = document.createElement('button');
+                        del.className = 'history-delete-btn';
+                        del.title = 'Delete chat';
+                        del.textContent = '✕';
+                        del.onclick = async (e) => {
+                            e.stopPropagation();
+                            if (!confirm('Delete this chat?')) return;
+                            try {
+                                await fetch(`/chats/${chat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentToken}` } });
+                                wrap.remove();
+                                if (currentChatId === chat.id) {
+                                    currentChatId = '';
+                                    messagesContainer.innerHTML = '';
+                                    document.getElementById('suggestions').style.display = 'flex';
+                                    document.getElementById('landingGreeting').style.display = 'block';
+                                }
+                            } catch(err) { console.error(err); }
+                        };
+                        wrap.appendChild(btn);
+                        wrap.appendChild(del);
+                        chatList.appendChild(wrap);
+                    });
+                }
             } catch(e) { console.error(e); }
         }
 
@@ -1142,6 +1282,7 @@
             showGuestToast();
             
             document.getElementById('suggestions').style.display = 'none';
+            document.getElementById('landingGreeting').style.display = 'none';
 
             messageInput.value = '';
             messageInput.style.height = 'auto';
@@ -1151,7 +1292,7 @@
 
             appendMessage('user', text, payloadImageData);
             const botBubble = appendMessage('bot', '');
-            botBubble.querySelector('.markdown-body').innerHTML = '<span style="opacity:0.5">Thinking...</span>';
+            botBubble.querySelector('.markdown-body').innerHTML = '<span class="thinking-dots" style="opacity:0.5">Thinking<span class="dots">...</span></span>';
 
             const model = modelSelector.value;
             abortController = new AbortController();
@@ -1308,6 +1449,47 @@
             updateTimer();
             timerInterval = setInterval(updateTimer, 1000);
         }
+        // ── Greeting ──────────────────────────────────────────────────────
+        (function setGreeting() {
+            const h = new Date().getHours();
+            const greet = h < 12 ? 'Good morning.' : h < 17 ? 'Good afternoon.' : 'Good evening.';
+            document.getElementById('greetingText').textContent = greet;
+        })();
+
+        // ── Scroll-to-bottom button ───────────────────────────────────────
+        const scrollBtn = document.getElementById('scrollBtn');
+        chatView.addEventListener('scroll', () => {
+            const distFromBottom = chatView.scrollHeight - chatView.scrollTop - chatView.clientHeight;
+            if (distFromBottom > 200) scrollBtn.classList.add('visible');
+            else scrollBtn.classList.remove('visible');
+        });
+        scrollBtn.addEventListener('click', () => {
+            chatView.scrollTo({ top: chatView.scrollHeight, behavior: 'smooth' });
+        });
+
+        // ── highlight.js + marked config ─────────────────────────────────
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try { return hljs.highlight(code, { language: lang }).value; } catch(e) {}
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
+        // Override renderer to add copy button + language label on code blocks
+        const renderer = new marked.Renderer();
+        renderer.code = function(code, lang) {
+            const language = lang || 'plaintext';
+            const highlighted = (lang && hljs.getLanguage(lang))
+                ? hljs.highlight(code, { language }).value
+                : hljs.highlightAuto(code).value;
+            const id = 'code_' + Math.random().toString(36).slice(2, 8);
+            return `<pre><div class="code-header"><span>${language}</span><button class="copy-code-btn" onclick="(function(b,id){var c=document.getElementById(id);navigator.clipboard.writeText(c.innerText);b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000);})(this,'${id}')">Copy</button></div><code id="${id}" class="hljs language-${language}">${highlighted}</code></pre>`;
+        };
+        marked.use({ renderer });
+
         // PWA Service Worker Registration
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
