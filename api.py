@@ -13,7 +13,10 @@ import threading
 import traceback
 import concurrent.futures
 import requests
+import websocket
+import ssl
 from flask import Flask, request, jsonify, Response, send_from_directory, render_template, stream_with_context
+from flask_sock import Sock
 from langchain_core.messages import HumanMessage
 
 from agent import XynthRunner
@@ -37,9 +40,53 @@ except Exception:
     _sb = None
 
 app = Flask(__name__)
+sock = Sock(app)
 print("🚀 Initialising Xynth model chain…")
 runner = XynthRunner()
 print(f"Meta WA configured: {_msg.configured()}")
+
+@sock.route('/ws/voice')
+def voice_realtime(ws):
+    api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not api_key:
+        ws.close()
+        return
+
+    # Use Alibaba's OpenAI-compatible Realtime endpoint
+    target_url = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime?model=qwen3.5-omni-plus-realtime"
+    
+    dash_ws = websocket.WebSocketApp(
+        target_url,
+        header=[f"Authorization: Bearer {api_key}"]
+    )
+    
+    # Relay from DashScope to Frontend
+    def on_message(ws_app, message):
+        try:
+            ws.send(message)
+        except Exception:
+            pass
+            
+    dash_ws.on_message = on_message
+    
+    def run_dash_ws():
+        dash_ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        
+    t = threading.Thread(target=run_dash_ws)
+    t.daemon = True
+    t.start()
+    
+    # Relay from Frontend to DashScope
+    try:
+        while True:
+            data = ws.receive()
+            if dash_ws.sock and dash_ws.sock.connected:
+                dash_ws.send(data)
+    except Exception as e:
+        print(f"Voice WS disconnected: {e}")
+    finally:
+        if dash_ws.sock and dash_ws.sock.connected:
+            dash_ws.close()
 
 
 def _run_agent(session_id: str, message: str) -> str:

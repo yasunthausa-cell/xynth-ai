@@ -18,6 +18,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/static/voice.js"></script>
     
     <style>
         :root {
@@ -504,6 +505,16 @@
         </div>
     </div>
 
+    <!-- Voice Modal -->
+    <div id="voiceModal" class="modal-overlay hidden" style="backdrop-filter: blur(8px);">
+        <div class="modal" style="text-align: center; background: var(--surface); padding: 40px; border-radius: 24px; position: relative;">
+            <button id="closeVoiceBtn" class="close-sidebar-btn" style="position: absolute; top: 16px; right: 16px; background:transparent; border:none; color:var(--text-secondary); font-size:18px; cursor:pointer;" onclick="stopVoiceMode()">✕</button>
+            <h2 style="margin-bottom: 32px; font-weight: 500;">Live Voice Mode</h2>
+            <div id="voiceOrb" style="width: 120px; height: 120px; border-radius: 50%; background: var(--accent); margin: 0 auto; box-shadow: 0 0 20px var(--accent); transition: transform 0.1s, box-shadow 0.1s;"></div>
+            <p id="voiceStatus" style="margin-top: 32px; color: var(--text-secondary); font-size: 14px;">Connecting...</p>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <div id="sidebar" class="sidebar">
         <div class="brand" style="display:flex; justify-content:space-between; align-items:center;">
@@ -785,32 +796,11 @@
             reader.readAsDataURL(file);
         });
 
-        // Voice Logic
+        // Voice Logic is now handled by voice.js
         const voiceBtn = document.getElementById('voiceBtn');
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'en-US';
-            
-            recognition.onstart = () => {
-                voiceBtn.style.color = '#ef4444';
-                messageInput.placeholder = "Listening...";
-            };
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                messageInput.value = (messageInput.value + " " + transcript).trim();
-                sendBtn.disabled = false;
-            };
-            recognition.onend = () => {
-                voiceBtn.style.color = 'var(--text-secondary)';
-                messageInput.placeholder = "Message Xynth...";
-            };
-            voiceBtn.addEventListener('click', () => recognition.start());
-        } else {
-            voiceBtn.style.display = 'none';
-        }
+        voiceBtn.addEventListener('click', () => {
+            initVoiceMode();
+        });
 
         function appendMessage(role, text, imgSrc=null) {
             const msgDiv = document.createElement('div');
