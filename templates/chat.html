@@ -744,7 +744,8 @@
     <!-- Auth Modal -->
     <div id="authModal" class="modal-overlay hidden">
         <div class="modal">
-            <img src="/static/logo.png" alt="Xynth" style="height: 24px; filter: invert(1); margin-bottom: 20px;">
+            <img src="/static/logo.png" alt="Xynth" style="height: 24px; filter: invert(1); margin-bottom: 6px;">
+            <div style="font-size:11px;color:var(--text-secondary);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:20px;">by Tetrific Inc.</div>
             <h2>Welcome Back</h2>
             <p>Log in or sign up to continue to Xynth.</p>
             <input type="email" id="emailInput" placeholder="Email Address">
@@ -752,6 +753,13 @@
             <button id="loginBtn" class="btn">Log In</button>
             <button id="signupBtn" class="btn btn-outline">Sign Up</button>
             <div id="authError" style="color: #ef4444; margin-top: 12px; font-size: 13px;"></div>
+            <button id="forgotPasswordBtn" style="background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;margin-top:12px;font-family:var(--font);">Forgot password?</button>
+            <div id="resetMsg" style="color:#10b981;font-size:13px;margin-top:8px;display:none;">Reset link sent! Check your email.</div>
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);text-align:center;">
+                <span style="font-size:12px;color:var(--text-secondary);">Part of the </span>
+                <a href="https://tetrific.com" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--text-secondary);font-weight:600;text-decoration:none;border-bottom:1px solid var(--border);">Tetrific</a>
+                <span style="font-size:12px;color:var(--text-secondary);"> ecosystem</span>
+            </div>
         </div>
     </div>
 
@@ -762,7 +770,8 @@
             <p id="limitMessage">You have hit your message limit for today. Please come back in:</p>
             <div class="countdown" id="countdownTimer">00:00:00</div>
             <p id="limitDate" style="font-size: 12px; color: var(--text-secondary);"></p>
-            <button class="btn" onclick="document.getElementById('limitModal').classList.add('hidden')">Got it</button>
+            <button class="btn" onclick="window.location.href='/pricing'" style="margin-top:16px;">⚡ Upgrade to Pro</button>
+            <button class="btn btn-outline" onclick="document.getElementById('limitModal').classList.add('hidden')">Maybe later</button>
         </div>
     </div>
 
@@ -817,7 +826,7 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             New Chat
         </button>
-        <a href="#" class="nav-btn">Pricing</a>
+        <a href="/pricing" class="nav-btn">Pricing</a>
         <a href="#" class="nav-btn">What's New</a>
 
         <div class="chat-list-label">Recent</div>
@@ -991,6 +1000,20 @@
             const { error } = await supabaseClient.auth.signUp({ email, password });
             if (error) document.getElementById('authError').textContent = error.message;
             else document.getElementById('authError').textContent = "Success! Please log in.";
+        });
+
+        document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
+            const email = document.getElementById('emailInput').value;
+            if (!email) { document.getElementById('authError').textContent = 'Enter your email first.'; return; }
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/?reset=1'
+            });
+            if (error) {
+                document.getElementById('authError').textContent = error.message;
+            } else {
+                document.getElementById('resetMsg').style.display = 'block';
+                document.getElementById('authError').textContent = '';
+            }
         });
 
         logoutBtn.addEventListener('click', async () => {

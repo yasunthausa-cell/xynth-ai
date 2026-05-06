@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xynth Pricing — Tetrific Inc.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --border: #2a2a3a;
+            --text: #ffffff;
+            --muted: #8888aa;
+            --accent: #6366f1;
+            --accent-glow: rgba(99,102,241,0.25);
+            --font: 'Bricolage Grotesque', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+        body { background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* NAV */
+        nav {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 40px; border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; background: rgba(10,10,15,0.85);
+            backdrop-filter: blur(12px); z-index: 100;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .nav-logo img { height: 22px; filter: invert(1); }
+        .nav-logo span { font-weight: 700; font-size: 18px; }
+        .nav-back {
+            padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); font-size: 14px;
+            cursor: pointer; text-decoration: none; transition: all 0.2s;
+        }
+        .nav-back:hover { color: var(--text); border-color: var(--text); }
+
+        /* HERO */
+        .hero {
+            text-align: center; padding: 80px 24px 48px;
+        }
+        .hero-badge {
+            display: inline-block; background: var(--accent-glow);
+            border: 1px solid var(--accent); color: #a5b4fc;
+            padding: 4px 14px; border-radius: 20px; font-size: 12px;
+            font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        .hero h1 {
+            font-size: clamp(32px, 5vw, 56px); font-weight: 800; line-height: 1.1;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p { font-size: 17px; color: var(--muted); max-width: 480px; margin: 0 auto 12px; line-height: 1.6; }
+
+        /* CARDS */
+        .cards {
+            display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
+            padding: 0 24px 80px; max-width: 900px; margin: 0 auto;
+        }
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 20px; padding: 32px; width: 100%; max-width: 380px;
+            position: relative; transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-4px); }
+        .card.pro {
+            border-color: var(--accent);
+            box-shadow: 0 0 40px var(--accent-glow);
+        }
+        .popular-badge {
+            position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+            background: var(--accent); color: white; font-size: 11px;
+            font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+            padding: 4px 14px; border-radius: 20px;
+        }
+        .plan-name { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+        .plan-price { font-size: 42px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+        .plan-price span { font-size: 18px; font-weight: 500; color: var(--muted); vertical-align: super; }
+        .plan-period { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+        .plan-divider { border: none; border-top: 1px solid var(--border); margin-bottom: 24px; }
+        .plan-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+        .plan-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+        .feat-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+        .feat-text { color: #ccc; }
+        .feat-text strong { color: white; font-weight: 600; }
+
+        .plan-btn {
+            width: 100%; padding: 14px; border-radius: 12px; font-size: 15px;
+            font-weight: 700; cursor: pointer; border: none; font-family: var(--font);
+            transition: all 0.2s; letter-spacing: 0.01em;
+        }
+        .plan-btn.free-btn {
+            background: transparent; border: 1px solid var(--border); color: var(--muted);
+        }
+        .plan-btn.free-btn:hover { border-color: var(--text); color: var(--text); }
+        .plan-btn.pro-btn {
+            background: var(--accent); color: white;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .plan-btn.pro-btn:hover { background: #4f46e5; }
+        .plan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* COMPARISON TABLE */
+        .compare-wrap { max-width: 720px; margin: 0 auto; padding: 0 24px 80px; }
+        .compare-wrap h2 { text-align: center; font-size: 24px; font-weight: 700; margin-bottom: 28px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { padding: 12px 16px; text-align: left; color: var(--muted); font-weight: 600;
+             border-bottom: 1px solid var(--border); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: #ddd; }
+        td:first-child { font-weight: 500; color: white; }
+        td.check { color: #10b981; font-size: 16px; }
+        td.cross  { color: #666; font-size: 16px; }
+
+        /* FOOTER */
+        footer { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+            background: #1e1e2e; border: 1px solid var(--accent); border-radius: 12px;
+            padding: 12px 24px; font-size: 14px; color: white; z-index: 999;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+
+        @media (max-width: 600px) {
+            nav { padding: 16px 20px; }
+            .hero { padding: 48px 16px 32px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-logo" href="/">
+        <img src="/static/logo.png" alt="Xynth">
+        <span>Xynth</span>
+    </a>
+    <a class="nav-back" href="/">← Back to Chat</a>
+</nav>
+
+<div class="hero">
+    <div class="hero-badge">Simple Pricing</div>
+    <h1>Research without limits.</h1>
+    <p>Start free. Upgrade when you need more power.</p>
+</div>
+
+<div class="cards">
+    <!-- FREE -->
+    <div class="card">
+        <div class="plan-name">Free</div>
+        <div class="plan-price"><span>$</span>0</div>
+        <div class="plan-period">forever</div>
+        <hr class="plan-divider">
+        <ul class="plan-features">
+            <li><span class="feat-icon">💬</span><span class="feat-text"><strong>20 messages</strong> per day</span></li>
+            <li><span class="feat-icon">🔍</span><span class="feat-text">Web research & citations</span></li>
+            <li><span class="feat-icon">📄</span><span class="feat-text">PDF export</span></li>
+            <li><span class="feat-icon">🖼️</span><span class="feat-text">Image understanding</span></li>
+            <li><span class="feat-icon">📜</span><span class="feat-text">Chat history (30 days)</span></li>
+        </ul>
+        <button class="plan-btn free-btn" onclick="window.location='/'">Start for Free</button>
+    </div>
+
+    <!-- PRO -->
+    <div class="card pro">
+        <div class="popular-badge">⚡ Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price"><span>$</span>12</div>
+        <div class="plan-period">per month · billed monthly</div>
+        <hr class="plan-divider">
+        <ul class="plan-features">
+            <li><span class="feat-icon">♾️</span><span class="feat-text"><strong>Unlimited</strong> messages</span></li>
+            <li><span class="feat-icon">🚀</span><span class="feat-text"><strong>Deep Dive</strong> research mode</span></li>
+            <li><span class="feat-icon">🔍</span><span class="feat-text">Advanced web research & citations</span></li>
+            <li><span class="feat-icon">🧠</span><span class="feat-text">Longer memory & context</span></li>
+            <li><span class="feat-icon">📄</span><span class="feat-text">Unlimited PDF exports</span></li>
+            <li><span class="feat-icon">⚡</span><span class="feat-text">Priority response speed</span></li>
+            <li><span class="feat-icon">🎧</span><span class="feat-text">Voice mode access</span></li>
+            <li><span class="feat-icon">💾</span><span class="feat-text">Unlimited chat history</span></li>
+        </ul>
+        <button class="plan-btn pro-btn" id="upgradeBtn">Upgrade to Pro</button>
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px;">Cancel anytime · No hidden fees</p>
+    </div>
+</div>
+
+<div class="compare-wrap">
+    <h2>Full Comparison</h2>
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Free</th>
+            <th>Pro</th>
+        </tr>
+        <tr><td>Daily messages</td><td>20</td><td>Unlimited</td></tr>
+        <tr><td>Web research & citations</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td>Image understanding</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td>PDF export</td><td class="check">✓</td><td class="check">✓</td></tr>
+        <tr><td>Deep Dive mode</td><td class="cross">—</td><td class="check">✓</td></tr>
+        <tr><td>Voice mode</td><td class="cross">—</td><td class="check">✓</td></tr>
+        <tr><td>Priority speed</td><td class="cross">—</td><td class="check">✓</td></tr>
+        <tr><td>Chat history</td><td>30 days</td><td>Unlimited</td></tr>
+    </table>
+</div>
+
+<footer>
+    &copy; 2026 Tetrific Inc. &nbsp;·&nbsp; <a href="/" style="color:var(--muted);">Xynth AI</a>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    const SUPABASE_URL = "https://ujlqigpwoaewdrylesxg.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHFpZ3B3b2Fld2RyeWxlc3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTk4NDcsImV4cCI6MjA5MzA5NTg0N30.zmcXsds_nFWjpPdh9V_RtpMV3HNrR4Dgk9VsuZ8Jd8Y";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const PADDLE_CLIENT_TOKEN = "{{ paddle_client_token }}";
+    const PADDLE_PRO_PRICE_ID = "{{ paddle_pro_price_id }}";
+
+    let currentUser = null;
+
+    // Init Paddle
+    if (PADDLE_CLIENT_TOKEN) {
+        Paddle.Setup({ token: PADDLE_CLIENT_TOKEN });
+    }
+
+    function showToast(msg, duration = 4000) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    // Auth state
+    sb.auth.onAuthStateChange((event, session) => {
+        currentUser = session?.user || null;
+    });
+
+    document.getElementById('upgradeBtn').addEventListener('click', async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) {
+            showToast('Please log in first to upgrade.');
+            setTimeout(() => window.location.href = '/', 1500);
+            return;
+        }
+
+        if (!PADDLE_CLIENT_TOKEN || !PADDLE_PRO_PRICE_ID) {
+            showToast('Payment system is being set up. Check back soon!');
+            return;
+        }
+
+        const btn = document.getElementById('upgradeBtn');
+        btn.disabled = true;
+        btn.textContent = 'Opening checkout…';
+
+        try {
+            Paddle.Checkout.open({
+                items: [{ priceId: PADDLE_PRO_PRICE_ID, quantity: 1 }],
+                customer: { email: session.user.email },
+                customData: { user_id: session.user.id },
+                settings: {
+                    displayMode: 'overlay',
+                    theme: 'dark',
+                    successUrl: window.location.origin + '/?upgraded=1',
+                }
+            });
+        } catch(e) {
+            showToast('Could not open checkout. Please try again.');
+            console.error(e);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Upgrade to Pro';
+        }
+    });
+
+    // Show success message if redirected back after payment
+    if (new URLSearchParams(window.location.search).get('upgraded') === '1') {
+        showToast('🎉 Welcome to Xynth Pro! Your plan is now active.');
+    }
+</script>
+</body>
+</html>

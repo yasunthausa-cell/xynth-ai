@@ -26,6 +26,7 @@ import groq_runner as _cf
 import builder_runner as _builder
 import research_runner as _research
 import rag_pipeline as _rag
+from limits import check_and_increment, get_user_plan, get_usage_today
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_media")
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -323,6 +324,25 @@ def chat_stream():
                 mimetype="text/event-stream"
             )
 
+        # ── Limit check (DB-backed) ───────────────────────────────────────
+        plan = get_user_plan(user_id, _sb) if user_id else "guest"
+        allowed, used, limit = check_and_increment(session_id, user_id, _sb, plan)
+        if not allowed:
+            import datetime
+            unlock_utc = (datetime.datetime.utcnow().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) + datetime.timedelta(days=1)).isoformat() + "Z"
+
+            def _over_limit():
+                yield f'data: {json.dumps({"type":"limit","plan":plan,"limit":limit,"unlock_utc":unlock_utc,"upgrade_url":"/pricing"})}\n\n'
+                yield f'data: {json.dumps({"type":"done"})}\n\n'
+
+            return Response(stream_with_context(_over_limit()), headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            })
+
         def generate_cf():
             # Vision queries still go through groq_runner
             if image_data:
@@ -390,8 +410,72 @@ def usage_session():
                     user_id = user_res.user.id
             except Exception:
                 pass
-    info = _cf.get_usage_info(session_id, _sb, user_id)
+    info = get_usage_today(session_id, user_id, _sb)
     return jsonify(info)
+
+
+@app.route("/pricing")
+def pricing_page():
+    """Pricing page."""
+    return render_template("pricing.html",
+        paddle_client_token=os.environ.get("PADDLE_CLIENT_TOKEN", ""),
+        paddle_pro_price_id=os.environ.get("PADDLE_PRO_PRICE_ID", ""),
+    )
+
+
+@app.route("/paddle/webhook", methods=["POST"])
+def paddle_webhook():
+    """Paddle Billing webhook handler.
+    Set this URL in Paddle dashboard under Notifications.
+    Verifies signature using PADDLE_WEBHOOK_SECRET env var.
+    """
+    import hmac, hashlib
+    secret = os.environ.get("PADDLE_WEBHOOK_SECRET", "")
+    raw_body = request.get_data()
+    sig_header = request.headers.get("Paddle-Signature", "")
+
+    # Verify signature
+    if secret and sig_header:
+        try:
+            parts = dict(p.split("=", 1) for p in sig_header.split(";"))
+            ts = parts.get("ts", "")
+            h1 = parts.get("h1", "")
+            signed = f"{ts}:{raw_body.decode()}"
+            expected = hmac.new(secret.encode(), signed.encode(), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(expected, h1):
+                return jsonify({"ok": False, "error": "Invalid signature"}), 401
+        except Exception as e:
+            print("Paddle sig error:", e)
+            return jsonify({"ok": False}), 400
+
+    event = request.get_json(silent=True) or {}
+    event_type = event.get("event_type", "")
+    data = event.get("data", {})
+    custom_data = data.get("custom_data") or {}
+    user_id = custom_data.get("user_id", "")
+    sub_id = data.get("id", "")
+
+    print(f"[Paddle] {event_type} | user={user_id} | sub={sub_id}")
+
+    if not _sb or not user_id:
+        return jsonify({"ok": True})
+
+    try:
+        if event_type in ("subscription.activated", "subscription.updated"):
+            status = data.get("status", "")
+            plan = "pro" if status == "active" else "free"
+            _sb.table("profiles").upsert({"id": user_id, "plan": plan, "paddle_subscription_id": sub_id}).execute()
+            print(f"[Paddle] Set {user_id} → {plan}")
+
+        elif event_type in ("subscription.canceled", "subscription.paused"):
+            _sb.table("profiles").upsert({"id": user_id, "plan": "free", "paddle_subscription_id": sub_id}).execute()
+            print(f"[Paddle] Downgraded {user_id} → free")
+
+    except Exception as e:
+        print("Paddle DB error:", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True})
 
 @app.route("/chats", methods=["GET"])
 def get_chats():
