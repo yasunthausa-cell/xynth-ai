@@ -534,6 +534,102 @@ def delete_chat(chat_id):
         print("DELETE /chats/<id> error:", e)
         return jsonify({"ok": False, "error": str(e)}), 500
 
+
+@app.route("/chats/<chat_id>/title", methods=["PATCH"])
+def update_chat_title(chat_id):
+    """Update a chat's auto-generated title."""
+    if not _sb: return jsonify({"ok": False}), 503
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"ok": False}), 401
+    token = auth_header.split(" ")[1]
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()[:80]
+    if not title:
+        return jsonify({"ok": False, "error": "title required"}), 400
+    try:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user:
+            return jsonify({"ok": False}), 401
+        _sb.table("chats").update({"title": title}).eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/account", methods=["GET"])
+def account_info():
+    """Return profile + today's usage for the authenticated user."""
+    if not _sb: return jsonify({"error": "no db"}), 503
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "unauthorized"}), 401
+    token = auth_header.split(" ")[1]
+    try:
+        from limits import get_usage_today, get_user_plan
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user:
+            return jsonify({"error": "unauthorized"}), 401
+        user = user_res.user
+        plan = get_user_plan(user.id, _sb)
+        usage = get_usage_today(user.id, user.id, _sb)
+        return jsonify({
+            "email": user.email,
+            "plan": plan,
+            "usage": usage,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/auth/welcome", methods=["POST"])
+def send_welcome_email():
+    """Send a Mailjet welcome email after signup. Called from frontend."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip()
+    name  = (data.get("name") or "there").strip()
+    if not email:
+        return jsonify({"ok": False}), 400
+
+    mj_key    = os.environ.get("MAILJET_API_KEY", "")
+    mj_secret = os.environ.get("MAILJET_API_SECRET", "")
+    if not mj_key or not mj_secret:
+        return jsonify({"ok": False, "error": "Mailjet not configured"}), 503
+
+    try:
+        import requests as _req
+        payload = {
+            "Messages": [{
+                "From": {"Email": "hello@tetrific.com", "Name": "Xynth AI"},
+                "To":   [{"Email": email, "Name": name}],
+                "Subject": "Welcome to Xynth AI 🔮",
+                "HTMLPart": f"""
+                <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:auto;background:#0a0a0f;color:#fff;border-radius:16px;padding:40px;">
+                  <div style="font-size:28px;font-weight:800;margin-bottom:8px;">Welcome to Xynth, {name}. 🔮</div>
+                  <div style="color:#8888aa;font-size:15px;line-height:1.7;margin-bottom:28px;">
+                    You now have access to a research AI that searches the live web, cites every source, and thinks deeply on any topic.<br><br>
+                    You start with <strong style="color:#fff">20 free messages per day</strong>. Upgrade to Pro for unlimited access.
+                  </div>
+                  <a href="https://xynth-ai-production.up.railway.app" style="display:inline-block;background:#fff;color:#0a0a0f;font-weight:700;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;">Open Xynth →</a>
+                  <div style="margin-top:40px;padding-top:20px;border-top:1px solid #1f1f2e;color:#555566;font-size:12px;">
+                    © 2026 Tetrific Inc. · <a href="https://xynth-ai-production.up.railway.app/pricing" style="color:#555566;">Upgrade to Pro</a>
+                  </div>
+                </div>
+                """
+            }]
+        }
+        resp = _req.post(
+            "https://api.mailjet.com/v3.1/send",
+            auth=(mj_key, mj_secret),
+            json=payload,
+            timeout=8
+        )
+        return jsonify({"ok": resp.status_code == 200})
+    except Exception as e:
+        print("Mailjet error:", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/announcement", methods=["GET"])
 def get_announcement():
     """Fetch the latest active announcement/popup for the web app."""
