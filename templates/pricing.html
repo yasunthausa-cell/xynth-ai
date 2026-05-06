@@ -268,12 +268,9 @@
 
     let currentUser = null;
 
-    // Init Paddle (sandbox mode for testing)
+    // Init Paddle — sandbox auto-detected from test_ token prefix
     if (PADDLE_CLIENT_TOKEN) {
-        Paddle.Setup({
-            token: PADDLE_CLIENT_TOKEN,
-            environment: 'sandbox'
-        });
+        Paddle.Setup({ token: PADDLE_CLIENT_TOKEN });
     }
 
     function showToast(msg, duration = 4000) {
