@@ -226,9 +226,12 @@
 
     let currentUser = null;
 
-    // Init Paddle
+    // Init Paddle (sandbox mode for testing)
     if (PADDLE_CLIENT_TOKEN) {
-        Paddle.Setup({ token: PADDLE_CLIENT_TOKEN });
+        Paddle.Setup({
+            token: PADDLE_CLIENT_TOKEN,
+            environment: 'sandbox'
+        });
     }
 
     function showToast(msg, duration = 4000) {
@@ -282,7 +285,7 @@
 
     // Show success message if redirected back after payment
     if (new URLSearchParams(window.location.search).get('upgraded') === '1') {
-        showToast('🎉 Welcome to Xynth Pro! Your plan is now active.');
+        showToast('Welcome to Xynth Pro! Your plan is now active.');
     }
 </script>
 </body>
