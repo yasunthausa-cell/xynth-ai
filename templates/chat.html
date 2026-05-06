@@ -725,6 +725,63 @@
             color: var(--accent);
         }
 
+        /* --- Guest Banner --- */
+        .guest-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .guest-banner.visible { display: flex; }
+        .guest-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .guest-banner-btn {
+            padding: 6px 14px; border-radius: 8px; font-size: 12px;
+            font-weight: 600; cursor: pointer; border: none; font-family: var(--font);
+            transition: opacity 0.2s;
+        }
+        .guest-banner-btn.primary { background: #fff; color: #111; }
+        .guest-banner-btn.primary:hover { opacity: 0.85; }
+        .guest-banner-btn.ghost {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .guest-banner-btn.ghost:hover { background: var(--surface-hover); }
+
+        /* --- Cookie Banner --- */
+        .cookie-banner {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; z-index: 9999; font-size: 13px;
+            color: var(--text-secondary);
+            transform: translateY(100%); transition: transform 0.3s ease;
+        }
+        .cookie-banner.visible { transform: translateY(0); }
+        .cookie-banner a { color: var(--accent); text-decoration: none; }
+        .cookie-banner-btns { display: flex; gap: 8px; flex-shrink: 0; }
+        .cookie-accept-btn {
+            padding: 8px 20px; border-radius: 8px; background: #fff;
+            color: #111; font-weight: 600; font-size: 13px; border: none;
+            cursor: pointer; font-family: var(--font); transition: opacity 0.2s;
+        }
+        .cookie-accept-btn:hover { opacity: 0.85; }
+        .cookie-decline-btn {
+            padding: 8px 16px; border-radius: 8px;
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-secondary); font-size: 13px;
+            cursor: pointer; font-family: var(--font);
+        }
+        .cookie-decline-btn:hover { background: var(--surface-hover); }
+
         @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
@@ -762,6 +819,7 @@
             <input type="password" id="passwordInput" placeholder="Password">
             <button id="loginBtn" class="btn">Log In</button>
             <button id="signupBtn" class="btn btn-outline">Sign Up</button>
+            <p style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;line-height:1.6;">By signing up you agree to Tetrific's <a href="https://tetrific.com/terms" target="_blank" style="color:var(--accent);text-decoration:none;">Terms</a> &amp; <a href="https://tetrific.com/privacy" target="_blank" style="color:var(--accent);text-decoration:none;">Privacy Policy</a>.</p>
             <div id="authError" style="color: #ef4444; margin-top: 12px; font-size: 13px;"></div>
             <button id="forgotPasswordBtn" style="background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;margin-top:12px;font-family:var(--font);">Forgot password?</button>
             <div id="resetMsg" style="color:#10b981;font-size:13px;margin-top:8px;display:none;">Reset link sent! Check your email.</div>
@@ -769,8 +827,9 @@
                 <span style="font-size:12px;color:var(--text-secondary);">Part of the </span>
                 <a href="https://tetrific.com" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--text-secondary);font-weight:600;text-decoration:none;border-bottom:1px solid var(--border);">Tetrific</a>
                 <span style="font-size:12px;color:var(--text-secondary);"> ecosystem</span>
-                <div style="margin-top:20px; color:#555566; font-size: 11px;">
-                    <a href="https://ai.tetrific.com" style="color:#555566; text-decoration:underline;">Visit Xynth</a>
+                <div style="margin-top:12px;display:flex;justify-content:center;gap:12px;">
+                    <a href="https://tetrific.com/terms" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Terms</a>
+                    <a href="https://tetrific.com/privacy" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Privacy</a>
                 </div>
             </div>
         </div>
@@ -840,32 +899,12 @@
         </div>
     </div>
 
-    <!-- Announcement Popup -->
-    <div id="announcementOverlay" class="announcement-overlay">
-        <div class="announcement-card">
-            <img id="announcementImage" class="announcement-banner" src="" alt="" style="display:none;">
-            <div class="announcement-body">
-                <span class="announcement-tag" id="announcementTag">Update</span>
-                <div class="announcement-title" id="announcementTitle"></div>
-                <div class="announcement-text" id="announcementText"></div>
-                <div class="announcement-footer">
-                    <button class="announcement-close-btn" id="announcementCloseBtn">Got it!</button>
-                    <button class="announcement-dismiss" id="announcementDismissBtn">Dismiss</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Guest Warning Toast -->
-    <div id="guestToast" class="guest-toast">
-        <div class="guest-toast-icon">💬</div>
-        <div class="guest-toast-body">
-            <strong>You're chatting as a guest</strong>
-            <p>Chats aren't saved and you have lower limits. Sign in for more.</p>
-            <div class="guest-toast-btns">
-                <button class="guest-toast-btn primary" id="toastLoginBtn">Log In</button>
-                <button class="guest-toast-btn secondary" id="toastDismissBtn">Dismiss</button>
-            </div>
+    <!-- Cookie Consent Banner -->
+    <div id="cookieBanner" class="cookie-banner">
+        <span>We use cookies to improve your experience. By using Xynth you agree to our <a href="https://tetrific.com/privacy" target="_blank">Privacy Policy</a>.</span>
+        <div class="cookie-banner-btns">
+            <button class="cookie-decline-btn" id="cookieDeclineBtn">Decline</button>
+            <button class="cookie-accept-btn" id="cookieAcceptBtn">Accept</button>
         </div>
     </div>
 
@@ -938,6 +977,17 @@
         </div>
 
         <div class="input-area">
+            <!-- Guest mode banner -->
+            <div class="guest-banner" id="guestBanner">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                    <span>You're in <strong style="color:var(--text-primary);">guest mode</strong> — chats aren't saved &amp; limits are lower.</span>
+                </div>
+                <div class="guest-banner-actions">
+                    <button class="guest-banner-btn primary" id="bannerLoginBtn">Sign In</button>
+                    <button class="guest-banner-btn ghost" id="bannerDismissBtn">Dismiss</button>
+                </div>
+            </div>
             <div class="image-preview-container" id="imagePreviewContainer">
                 <img id="imagePreview" class="image-preview" src="">
                 <button class="remove-image-btn" id="removeImageBtn">✕</button>
@@ -1034,22 +1084,39 @@
             document.getElementById('sidebar').classList.remove('open');
         });
 
-        // Guest toast
-        let guestToastShown = false;
-        const guestToast = document.getElementById('guestToast');
-        document.getElementById('toastLoginBtn').addEventListener('click', () => {
-            guestToast.classList.remove('show');
+        // Guest banner
+        let guestBannerShown = false;
+        const guestBanner = document.getElementById('guestBanner');
+
+        document.getElementById('bannerLoginBtn').addEventListener('click', () => {
+            guestBanner.classList.remove('visible');
             document.getElementById('authModal').classList.remove('hidden');
         });
-        document.getElementById('toastDismissBtn').addEventListener('click', () => {
-            guestToast.classList.remove('show');
-            guestToastShown = true; // don't show again this session
+        document.getElementById('bannerDismissBtn').addEventListener('click', () => {
+            guestBanner.classList.remove('visible');
+            guestBannerShown = true;
         });
         function showGuestToast() {
-            if (currentUser || guestToastShown) return;
-            guestToast.classList.add('show');
-            setTimeout(() => guestToast.classList.remove('show'), 7000);
+            if (currentUser || guestBannerShown) return;
+            guestBanner.classList.add('visible');
+            guestBannerShown = true;
         }
+
+        // Cookie consent
+        (function() {
+            const cookieBanner = document.getElementById('cookieBanner');
+            const accepted = localStorage.getItem('xynth_cookies_accepted');
+            if (!accepted) {
+                setTimeout(() => cookieBanner.classList.add('visible'), 1500);
+            }
+            document.getElementById('cookieAcceptBtn').addEventListener('click', () => {
+                localStorage.setItem('xynth_cookies_accepted', '1');
+                cookieBanner.classList.remove('visible');
+            });
+            document.getElementById('cookieDeclineBtn').addEventListener('click', () => {
+                cookieBanner.classList.remove('visible');
+            });
+        })();
 
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const email = document.getElementById('emailInput').value;

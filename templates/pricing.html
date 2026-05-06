@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xynth Pricing — Tetrific Inc.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <style>
@@ -16,316 +18,646 @@
             --text: #ffffff;
             --muted: #8888aa;
             --accent: #10b981;
-            --accent-glow: rgba(16,185,129,0.2);
+            --accent-glow: rgba(16, 185, 129, 0.2);
             --font: 'Bricolage Grotesque', sans-serif;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
-        body { background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font);
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
 
         /* NAV */
         nav {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 20px 40px; border-bottom: 1px solid var(--border);
-            position: sticky; top: 0; background: rgba(10,10,15,0.85);
-            backdrop-filter: blur(12px); z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: rgba(10, 10, 15, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 100;
         }
-        .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-        .nav-logo img { height: 22px; filter: invert(1); }
-        .nav-logo span { font-weight: 700; font-size: 18px; }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .nav-logo img {
+            height: 22px;
+            filter: invert(1);
+        }
+
+        .nav-logo span {
+            font-weight: 700;
+            font-size: 18px;
+        }
+
         .nav-back {
-            padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
-            background: transparent; color: var(--muted); font-size: 14px;
-            cursor: pointer; text-decoration: none; transition: all 0.2s;
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
         }
-        .nav-back:hover { color: var(--text); border-color: var(--text); }
+
+        .nav-back:hover {
+            color: var(--text);
+            border-color: var(--text);
+        }
 
         /* HERO */
         .hero {
-            text-align: center; padding: 80px 24px 48px;
+            text-align: center;
+            padding: 80px 24px 48px;
         }
+
         .hero-badge {
-            display: inline-block; background: var(--accent-glow);
-            border: 1px solid var(--accent); color: #a5b4fc;
-            padding: 4px 14px; border-radius: 20px; font-size: 12px;
-            font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+            display: inline-block;
+            background: var(--accent-glow);
+            border: 1px solid var(--accent);
+            color: #a5b4fc;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
             margin-bottom: 20px;
         }
+
         .hero h1 {
-            font-size: clamp(32px, 5vw, 56px); font-weight: 800; line-height: 1.1;
+            font-size: clamp(32px, 5vw, 56px);
+            font-weight: 800;
+            line-height: 1.1;
             margin-bottom: 16px;
             color: #fff;
         }
-        .hero p { font-size: 17px; color: var(--muted); max-width: 480px; margin: 0 auto 12px; line-height: 1.6; }
+
+        .hero p {
+            font-size: 17px;
+            color: var(--muted);
+            max-width: 480px;
+            margin: 0 auto 12px;
+            line-height: 1.6;
+        }
 
         /* CARDS */
         .cards {
-            display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
-            padding: 0 24px 80px; max-width: 900px; margin: 0 auto;
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            flex-wrap: wrap;
+            padding: 0 24px 80px;
+            max-width: 900px;
+            margin: 0 auto;
         }
+
         .card {
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: 20px; padding: 32px; width: 100%; max-width: 380px;
-            position: relative; transition: transform 0.2s;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            width: 100%;
+            max-width: 380px;
+            position: relative;
+            transition: transform 0.2s;
         }
-        .card:hover { transform: translateY(-4px); }
+
+        .card:hover {
+            transform: translateY(-4px);
+        }
+
         .card.pro {
             border-color: var(--accent);
             box-shadow: 0 0 40px var(--accent-glow);
         }
+
         .popular-badge {
-            position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
-            background: var(--accent); color: white; font-size: 11px;
-            font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-            padding: 4px 14px; border-radius: 20px;
+            position: absolute;
+            top: -13px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 4px 14px;
+            border-radius: 20px;
         }
-        .plan-name { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
-        .plan-price { font-size: 42px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
-        .plan-price span { font-size: 18px; font-weight: 500; color: var(--muted); vertical-align: super; }
-        .plan-period { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
-        .plan-divider { border: none; border-top: 1px solid var(--border); margin-bottom: 24px; }
-        .plan-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-        .plan-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
-        .feat-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-        .feat-text { color: #ccc; }
-        .feat-text strong { color: white; font-weight: 600; }
+
+        .plan-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+        }
+
+        .plan-price {
+            font-size: 42px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .plan-price span {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--muted);
+            vertical-align: super;
+        }
+
+        .plan-period {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 28px;
+        }
+
+        .plan-divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .plan-features {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .plan-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .feat-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .feat-text {
+            color: #ccc;
+        }
+
+        .feat-text strong {
+            color: white;
+            font-weight: 600;
+        }
 
         .plan-btn {
-            width: 100%; padding: 14px; border-radius: 12px; font-size: 15px;
-            font-weight: 700; cursor: pointer; border: none; font-family: var(--font);
-            transition: all 0.2s; letter-spacing: 0.01em;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            font-family: var(--font);
+            transition: all 0.2s;
+            letter-spacing: 0.01em;
         }
+
         .plan-btn.free-btn {
-            background: transparent; border: 1px solid var(--border); color: var(--muted);
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
         }
-        .plan-btn.free-btn:hover { border-color: var(--text); color: var(--text); }
+
+        .plan-btn.free-btn:hover {
+            border-color: var(--text);
+            color: var(--text);
+        }
+
         .plan-btn.pro-btn {
-            background: #ffffff; color: #111111;
+            background: #ffffff;
+            color: #111111;
         }
-        .plan-btn.pro-btn:hover { background: #e5e5e5; }
-        .plan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .plan-btn.pro-btn:hover {
+            background: #e5e5e5;
+        }
+
+        .plan-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
         /* COMPARISON TABLE */
-        .compare-wrap { max-width: 720px; margin: 0 auto; padding: 0 24px 80px; }
-        .compare-wrap h2 { text-align: center; font-size: 24px; font-weight: 700; margin-bottom: 28px; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th { padding: 12px 16px; text-align: left; color: var(--muted); font-weight: 600;
-             border-bottom: 1px solid var(--border); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
-        td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: #ddd; }
-        td:first-child { font-weight: 500; color: white; }
-        td.check { color: #10b981; font-size: 16px; }
-        td.cross  { color: #666; font-size: 16px; }
+        .compare-wrap {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 24px 80px;
+        }
+
+        .compare-wrap h2 {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 28px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            color: var(--muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            color: #ddd;
+        }
+
+        td:first-child {
+            font-weight: 500;
+            color: white;
+        }
+
+        td.check {
+            color: #10b981;
+            font-size: 16px;
+        }
+
+        td.cross {
+            color: #666;
+            font-size: 16px;
+        }
 
         /* FOOTER */
-        footer { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+        footer {
+            text-align: center;
+            padding: 32px;
+            color: var(--muted);
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+        }
 
         /* Toast */
         .toast {
-            position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
-            background: #1e1e2e; border: 1px solid var(--accent); border-radius: 12px;
-            padding: 12px 24px; font-size: 14px; color: white; z-index: 999;
-            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e1e2e;
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-size: 14px;
+            color: white;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
         }
-        .toast.show { opacity: 1; }
+
+        .toast.show {
+            opacity: 1;
+        }
 
         @media (max-width: 600px) {
-            nav { padding: 16px 20px; }
-            .hero { padding: 48px 16px 32px; }
+            nav {
+                padding: 16px 20px;
+            }
+
+            .hero {
+                padding: 48px 16px 32px;
+            }
         }
     </style>
 </head>
+
 <body>
 
-<nav>
-    <a class="nav-logo" href="/">
-        <img src="/static/logo.png" alt="Xynth">
-        <span>Xynth</span>
-    </a>
-    <a class="nav-back" href="/">← Back to Chat</a>
-</nav>
+    <nav>
+        <a class="nav-logo" href="/">
+            <img src="/static/logo.png" alt="Xynth">
+        </a>
+        <a class="nav-back" href="/">← Back to Chat</a>
+    </nav>
 
-<div class="hero">
-    <div class="hero-badge">Simple Pricing</div>
-    <h1>Research without limits.</h1>
-    <p>Start free. Upgrade when you need more power.</p>
-</div>
-
-<div class="cards">
-    <!-- FREE -->
-    <div class="card">
-        <div class="plan-name">Free</div>
-        <div class="plan-price"><span>$</span>0</div>
-        <div class="plan-period">forever</div>
-        <hr class="plan-divider">
-        <ul class="plan-features">
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-                <span class="feat-text"><strong>20 messages</strong> per day</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-                <span class="feat-text">Web research & citations</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-                <span class="feat-text">PDF export</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
-                <span class="feat-text">Image understanding</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
-                <span class="feat-text">Chat history (30 days)</span>
-            </li>
-        </ul>
-        <button class="plan-btn free-btn" onclick="window.location='/'">Start for Free</button>
+    <div class="hero">
+        <div class="hero-badge">Simple Pricing</div>
+        <h1>Research without limits.</h1>
+        <p>Start free. Upgrade when you need more power.</p>
     </div>
 
-    <!-- PRO -->
-    <div class="card pro">
-        <div class="popular-badge" style="display:flex;align-items:center;justify-content:center;gap:5px;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            Most Popular
+    <div class="cards">
+        <!-- FREE -->
+        <div class="card">
+            <div class="plan-name">Free</div>
+            <div class="plan-price"><span>$</span>0</div>
+            <div class="plan-period">forever</div>
+            <hr class="plan-divider">
+            <ul class="plan-features">
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg></span>
+                    <span class="feat-text"><strong>20 messages</strong> per day</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg></span>
+                    <span class="feat-text">Web research & citations</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg></span>
+                    <span class="feat-text">PDF export</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg></span>
+                    <span class="feat-text">Image understanding</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg></span>
+                    <span class="feat-text">Chat history (30 days)</span>
+                </li>
+            </ul>
+            <button class="plan-btn free-btn" onclick="window.location='/'">Start for Free</button>
         </div>
-        <div class="plan-name">Pro</div>
-        <div class="plan-price"><span>$</span>12</div>
-        <div class="plan-period">per month · billed monthly</div>
-        <hr class="plan-divider">
-        <ul class="plan-features">
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></span>
-                <span class="feat-text"><strong>Unlimited</strong> messages</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>
-                <span class="feat-text"><strong>Deep Dive</strong> research mode</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-                <span class="feat-text">Advanced web research & citations</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a9 9 0 0 1 9 9c0 4.97-4.03 9-9 9S3 15.97 3 11a9 9 0 0 1 9-9z"/><path d="M9 12l2 2 4-4"/></svg></span>
-                <span class="feat-text">Longer memory & context</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-                <span class="feat-text">Unlimited PDF exports</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
-                <span class="feat-text">Priority response speed</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span>
-                <span class="feat-text">Voice mode access</span>
-            </li>
-            <li>
-                <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
-                <span class="feat-text">Unlimited chat history</span>
-            </li>
-        </ul>
-        <button class="plan-btn pro-btn" id="upgradeBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            Upgrade to Pro
-        </button>
-        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px;">Cancel anytime · No hidden fees</p>
+
+        <!-- PRO -->
+        <div class="card pro">
+            <div class="popular-badge" style="display:flex;align-items:center;justify-content:center;gap:5px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
+                </svg>
+                Most Popular
+            </div>
+            <div class="plan-name">Pro</div>
+            <div class="plan-price"><span>$</span>12</div>
+            <div class="plan-period">per month · billed monthly</div>
+            <hr class="plan-divider">
+            <ul class="plan-features">
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 20V10" />
+                            <path d="M12 20V4" />
+                            <path d="M6 20v-6" />
+                        </svg></span>
+                    <span class="feat-text"><strong>Unlimited</strong> messages</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            <line x1="11" y1="8" x2="11" y2="14" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg></span>
+                    <span class="feat-text"><strong>Deep Dive</strong> research mode</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg></span>
+                    <span class="feat-text">Advanced web research & citations</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a9 9 0 0 1 9 9c0 4.97-4.03 9-9 9S3 15.97 3 11a9 9 0 0 1 9-9z" />
+                            <path d="M9 12l2 2 4-4" />
+                        </svg></span>
+                    <span class="feat-text">Longer memory & context</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg></span>
+                    <span class="feat-text">Unlimited PDF exports</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg></span>
+                    <span class="feat-text">Priority response speed</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="23" />
+                        </svg></span>
+                    <span class="feat-text">Voice mode access</span>
+                </li>
+                <li>
+                    <span class="feat-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg></span>
+                    <span class="feat-text">Unlimited chat history</span>
+                </li>
+            </ul>
+            <button class="plan-btn pro-btn" id="upgradeBtn"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
+                </svg>
+                Upgrade to Pro
+            </button>
+            <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px;">Cancel anytime · No hidden
+                fees</p>
+        </div>
     </div>
-</div>
 
-<div class="compare-wrap">
-    <h2>Full Comparison</h2>
-    <table>
-        <tr>
-            <th>Feature</th>
-            <th>Free</th>
-            <th>Pro</th>
-        </tr>
-        <tr><td>Daily messages</td><td>20</td><td>Unlimited</td></tr>
-        <tr><td>Web research & citations</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>Image understanding</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>PDF export</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>Deep Dive mode</td><td class="cross">—</td><td class="check">✓</td></tr>
-        <tr><td>Voice mode</td><td class="cross">—</td><td class="check">✓</td></tr>
-        <tr><td>Priority speed</td><td class="cross">—</td><td class="check">✓</td></tr>
-        <tr><td>Chat history</td><td>30 days</td><td>Unlimited</td></tr>
-    </table>
-</div>
+    <div class="compare-wrap">
+        <h2>Full Comparison</h2>
+        <table>
+            <tr>
+                <th>Feature</th>
+                <th>Free</th>
+                <th>Pro</th>
+            </tr>
+            <tr>
+                <td>Daily messages</td>
+                <td>20</td>
+                <td>Unlimited</td>
+            </tr>
+            <tr>
+                <td>Web research & citations</td>
+                <td class="check">✓</td>
+                <td class="check">✓</td>
+            </tr>
+            <tr>
+                <td>Image understanding</td>
+                <td class="check">✓</td>
+                <td class="check">✓</td>
+            </tr>
+            <tr>
+                <td>PDF export</td>
+                <td class="check">✓</td>
+                <td class="check">✓</td>
+            </tr>
+            <tr>
+                <td>Deep Dive mode</td>
+                <td class="cross">—</td>
+                <td class="check">✓</td>
+            </tr>
+            <tr>
+                <td>Voice mode</td>
+                <td class="cross">—</td>
+                <td class="check">✓</td>
+            </tr>
+            <tr>
+                <td>Priority speed</td>
+                <td class="cross">—</td>
+                <td class="check">✓</td>
+            </tr>
+            <tr>
+                <td>Chat history</td>
+                <td>30 days</td>
+                <td>Unlimited</td>
+            </tr>
+        </table>
+    </div>
 
-<footer>
-    &copy; 2026 Tetrific Inc. &nbsp;·&nbsp; <a href="/" style="color:var(--muted);">Xynth AI</a>
-</footer>
+    <footer>
+        &copy; 2026 Tetrific Inc. &nbsp;·&nbsp; <a href="/" style="color:var(--muted);">Xynth AI</a>
+        &nbsp;·&nbsp; <a href="https://tetrific.com/terms" target="_blank" style="color:var(--muted);">Terms of
+            Service</a>
+        &nbsp;·&nbsp; <a href="https://tetrific.com/privacy" target="_blank" style="color:var(--muted);">Privacy
+            Policy</a>
+    </footer>
 
-<div class="toast" id="toast"></div>
+    <div class="toast" id="toast"></div>
 
-<script>
-    const SUPABASE_URL = "https://ujlqigpwoaewdrylesxg.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHFpZ3B3b2Fld2RyeWxlc3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTk4NDcsImV4cCI6MjA5MzA5NTg0N30.zmcXsds_nFWjpPdh9V_RtpMV3HNrR4Dgk9VsuZ8Jd8Y";
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    <script>
+        const SUPABASE_URL = "https://ujlqigpwoaewdrylesxg.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHFpZ3B3b2Fld2RyeWxlc3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTk4NDcsImV4cCI6MjA5MzA5NTg0N30.zmcXsds_nFWjpPdh9V_RtpMV3HNrR4Dgk9VsuZ8Jd8Y";
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const PADDLE_CLIENT_TOKEN = "{{ paddle_client_token }}";
-    const PADDLE_PRO_PRICE_ID = "{{ paddle_pro_price_id }}";
+        const PADDLE_CLIENT_TOKEN = "{{ paddle_client_token }}";
+        const PADDLE_PRO_PRICE_ID = "{{ paddle_pro_price_id }}";
 
-    let currentUser = null;
+        let currentUser = null;
 
-    // Init Paddle — sandbox auto-detected from test_ token prefix
-    if (PADDLE_CLIENT_TOKEN) {
-        Paddle.Setup({ token: PADDLE_CLIENT_TOKEN });
-    }
-
-    function showToast(msg, duration = 4000) {
-        const t = document.getElementById('toast');
-        t.textContent = msg;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), duration);
-    }
-
-    // Auth state
-    sb.auth.onAuthStateChange((event, session) => {
-        currentUser = session?.user || null;
-    });
-
-    document.getElementById('upgradeBtn').addEventListener('click', async () => {
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) {
-            showToast('Please log in first to upgrade.');
-            setTimeout(() => window.location.href = '/', 1500);
-            return;
+        // Init Paddle — sandbox auto-detected from test_ token prefix
+        if (PADDLE_CLIENT_TOKEN) {
+            Paddle.Setup({ token: PADDLE_CLIENT_TOKEN });
         }
 
-        if (!PADDLE_CLIENT_TOKEN || !PADDLE_PRO_PRICE_ID) {
-            showToast('Payment system is being set up. Check back soon!');
-            return;
+        function showToast(msg, duration = 4000) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), duration);
         }
 
-        const btn = document.getElementById('upgradeBtn');
-        btn.disabled = true;
-        btn.textContent = 'Opening checkout…';
+        // Auth state
+        sb.auth.onAuthStateChange((event, session) => {
+            currentUser = session?.user || null;
+        });
 
-        try {
-            Paddle.Checkout.open({
-                items: [{ priceId: PADDLE_PRO_PRICE_ID, quantity: 1 }],
-                customer: { email: session.user.email },
-                customData: { user_id: session.user.id },
-                settings: {
-                    displayMode: 'overlay',
-                    theme: 'dark',
-                    successUrl: window.location.origin + '/?upgraded=1',
-                }
-            });
-        } catch(e) {
-            showToast('Could not open checkout. Please try again.');
-            console.error(e);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Upgrade to Pro';
+        document.getElementById('upgradeBtn').addEventListener('click', async () => {
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) {
+                showToast('Please log in first to upgrade.');
+                setTimeout(() => window.location.href = '/', 1500);
+                return;
+            }
+
+            if (!PADDLE_CLIENT_TOKEN || !PADDLE_PRO_PRICE_ID) {
+                showToast('Payment system is being set up. Check back soon!');
+                return;
+            }
+
+            const btn = document.getElementById('upgradeBtn');
+            btn.disabled = true;
+            btn.textContent = 'Opening checkout…';
+
+            try {
+                Paddle.Checkout.open({
+                    items: [{ priceId: PADDLE_PRO_PRICE_ID, quantity: 1 }],
+                    customer: { email: session.user.email },
+                    customData: { user_id: session.user.id },
+                    settings: {
+                        displayMode: 'overlay',
+                        theme: 'dark',
+                        successUrl: window.location.origin + '/?upgraded=1',
+                    }
+                });
+            } catch (e) {
+                showToast('Could not open checkout. Please try again.');
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Upgrade to Pro';
+            }
+        });
+
+        // Show success message if redirected back after payment
+        if (new URLSearchParams(window.location.search).get('upgraded') === '1') {
+            showToast('Welcome to Xynth Pro! Your plan is now active.');
         }
-    });
-
-    // Show success message if redirected back after payment
-    if (new URLSearchParams(window.location.search).get('upgraded') === '1') {
-        showToast('Welcome to Xynth Pro! Your plan is now active.');
-    }
-</script>
+    </script>
 </body>
+
 </html>
