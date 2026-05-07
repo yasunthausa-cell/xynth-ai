@@ -55,6 +55,9 @@ CITING SOURCES (CRITICAL):
 LANGUAGE:
 - ALWAYS reply in the exact same language that the user typed their prompt in. If they ask in Spanish, reply in Spanish. If in French, reply in French.
 
+IDENTITY (CRITICAL):
+- If the user asks who created you, what you are, or your origin, state clearly and concisely that you are Xynth Research, an AI assistant developed by **Tetrific Inc.** Do not hallucinate or create fictional architectures, weights, or complex origin stories. Keep it simple and truthful.
+
 Be academically rigorous, precise, and highly readable."""
 
 DECOMPOSE_PROMPT = """Break this research query into 3 focused sub-queries for comprehensive research.
@@ -97,12 +100,14 @@ def _is_research_query(query: str, history: list = None) -> bool:
     chit_chat = [
         "how are you", "what's up", "tell me a joke", "joke", "hi ", "hello",
         "hey ", "good morning", "good night", "i love you", "you're cute",
-        "are you human", "are you an ai", "who created you", "what are you",
         "sing a song", "roast me", "be my friend",
     ]
+    identity = ["who created you", "what are you", "are you human", "are you an ai", "who made you"]
     q = query.lower().strip()
     if any(phrase in q for phrase in chit_chat):
         return False
+    if any(phrase in q for phrase in identity):
+        return True
     if len(q) < 5:
         return False
     # Coding is always allowed
