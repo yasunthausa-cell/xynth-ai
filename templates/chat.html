@@ -1285,7 +1285,10 @@
         async function loadChatHistory() {
             if (!currentToken) return;
             try {
-                const res = await fetch('/chats', { headers: { 'Authorization': `Bearer ${currentToken}` } });
+                const res = await fetch('/chats', { 
+                    headers: { 'Authorization': `Bearer ${currentToken}` },
+                    cache: 'no-store'
+                });
                 const chats = await res.json();
                 const chatList = document.getElementById('chatList');
                 chatList.innerHTML = '';
@@ -1352,7 +1355,10 @@
             if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
 
             try {
-                const res = await fetch(`/chats/${chatId}`, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+                const res = await fetch(`/chats/${chatId}`, { 
+                    headers: { 'Authorization': `Bearer ${currentToken}` },
+                    cache: 'no-store'
+                });
                 const messages = await res.json();
                 messagesContainer.innerHTML = '';
                 messages.forEach(msg => appendMessage(msg.role, msg.content));
