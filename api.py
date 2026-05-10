@@ -417,65 +417,96 @@ def usage_session():
 @app.route("/pricing")
 def pricing_page():
     """Pricing page."""
-    return render_template("pricing.html",
-        paddle_client_token=os.environ.get("PADDLE_CLIENT_TOKEN", ""),
-        paddle_pro_price_id=os.environ.get("PADDLE_PRO_PRICE_ID", ""),
-    )
+    return render_template("pricing.html")
 
 
-@app.route("/paddle/webhook", methods=["POST"])
-def paddle_webhook():
-    """Paddle Billing webhook handler.
-    Set this URL in Paddle dashboard under Notifications.
-    Verifies signature using PADDLE_WEBHOOK_SECRET env var.
-    """
-    import hmac, hashlib
-    secret = os.environ.get("PADDLE_WEBHOOK_SECRET", "")
-    raw_body = request.get_data()
-    sig_header = request.headers.get("Paddle-Signature", "")
+POLAR_ACCESS_TOKEN = os.environ.get("POLAR_ACCESS_TOKEN", "")
+POLAR_PRO_PRODUCT_ID = os.environ.get("POLAR_PRO_PRODUCT_ID", "")
+POLAR_WEBHOOK_SECRET = os.environ.get("POLAR_WEBHOOK_SECRET", "")
+POLAR_SERVER = os.environ.get("POLAR_SERVER", "sandbox")
+POLAR_BASE = "https://sandbox-api.polar.sh" if POLAR_SERVER == "sandbox" else "https://api.polar.sh"
 
-    # Verify signature
-    if secret and sig_header:
-        try:
-            parts = dict(p.split("=", 1) for p in sig_header.split(";"))
-            ts = parts.get("ts", "")
-            h1 = parts.get("h1", "")
-            signed = f"{ts}:{raw_body.decode()}"
-            expected = hmac.new(secret.encode(), signed.encode(), hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(expected, h1):
-                return jsonify({"ok": False, "error": "Invalid signature"}), 401
-        except Exception as e:
-            print("Paddle sig error:", e)
-            return jsonify({"ok": False}), 400
+@app.route("/polar/checkout", methods=["POST"])
+def polar_create_checkout():
+    if not POLAR_ACCESS_TOKEN or not POLAR_PRO_PRODUCT_ID:
+        return jsonify({"error": "Polar is not configured"}), 503
 
-    event = request.get_json(silent=True) or {}
-    event_type = event.get("event_type", "")
-    data = event.get("data", {})
-    custom_data = data.get("custom_data") or {}
-    user_id = custom_data.get("user_id", "")
-    sub_id = data.get("id", "")
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
 
-    print(f"[Paddle] {event_type} | user={user_id} | sub={sub_id}")
-
-    if not _sb or not user_id:
-        return jsonify({"ok": True})
-
+    payload = {
+        "products": [POLAR_PRO_PRODUCT_ID],
+        "metadata": {"user_id": user_id, "app": "xynth-web"},
+    }
+    headers = {
+        "Authorization": f"Bearer {POLAR_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    import requests
     try:
-        if event_type in ("subscription.activated", "subscription.updated"):
-            status = data.get("status", "")
-            plan = "pro" if status == "active" else "free"
-            _sb.table("profiles").upsert({"id": user_id, "plan": plan, "paddle_subscription_id": sub_id}).execute()
-            print(f"[Paddle] Set {user_id} → {plan}")
-
-        elif event_type in ("subscription.canceled", "subscription.paused"):
-            _sb.table("profiles").upsert({"id": user_id, "plan": "free", "paddle_subscription_id": sub_id}).execute()
-            print(f"[Paddle] Downgraded {user_id} → free")
-
+        r = requests.post(f"{POLAR_BASE}/v1/checkouts/", json=payload, headers=headers, timeout=15)
+        if r.status_code >= 400:
+            print(f"Polar checkout error {r.status_code}: {r.text}")
+            return jsonify({"error": f"Polar error: {r.text}"}), 502
+        
+        data = r.json()
+        checkout_id = data.get("id")
+        url = data.get("url")
+        if not url or not checkout_id:
+            return jsonify({"error": "Invalid Polar response"}), 502
+            
+        return jsonify({"url": url, "checkout_id": checkout_id})
     except Exception as e:
-        print("Paddle DB error:", e)
-        return jsonify({"ok": False, "error": str(e)}), 500
+        print("polar_create_checkout failed:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/polar/webhook", methods=["POST"])
+def polar_webhook():
+    event = request.get_json(silent=True) or {}
+    event_type = event.get("type")
+    data = event.get("data", {}) or {}
+    
+    metadata = data.get("metadata") or {}
+    user_id = metadata.get("user_id")
+    checkout_id = data.get("id") or data.get("checkout_id")
+    
+    print(f"📥 Polar webhook received: {event_type} user={user_id} ckid={checkout_id} status={data.get('status')}")
+
+    PAID_EVENTS = {
+        "checkout.updated",
+        "checkout.confirmed", 
+        "order.created",
+        "order.paid",
+        "subscription.created",
+        "subscription.active",
+    }
+
+    paid = False
+    if event_type in PAID_EVENTS:
+        status = (data.get("status") or "").lower()
+        if event_type.startswith("order.") or event_type.startswith("subscription."):
+            paid = True
+        elif status in {"succeeded", "completed", "confirmed", "success"}:
+            paid = True
+
+    if paid and user_id and _sb:
+        try:
+            _sb.table("profiles").upsert({"id": user_id, "plan": "pro", "paddle_subscription_id": checkout_id}).execute()
+            print(f"✅ Pro granted to user {user_id}")
+        except Exception as e:
+            print("DB error on webhook:", e)
 
     return jsonify({"ok": True})
+
+@app.route("/polar/customer-portal", methods=["POST"])
+def polar_customer_portal():
+    if not POLAR_ACCESS_TOKEN:
+        return jsonify({"error": "Polar not configured"}), 503
+    portal_url = f"https://{'sandbox.' if POLAR_SERVER == 'sandbox' else ''}polar.sh/purchases/subscriptions"
+    return jsonify({"url": portal_url})
 
 @app.route("/chats", methods=["GET"])
 def get_chats():
@@ -533,6 +564,86 @@ def delete_chat(chat_id):
     except Exception as e:
         print("DELETE /chats/<id> error:", e)
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/chats/<chat_id>", methods=["PATCH"])
+def rename_chat(chat_id):
+    """Rename a chat (ownership verified)."""
+    if not _sb: return jsonify({"ok": False}), 503
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+    token = auth_header.split(" ")[1]
+    data = request.get_json(silent=True) or {}
+    new_title = data.get("title")
+    if not new_title:
+        return jsonify({"ok": False, "error": "Missing title"}), 400
+    try:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user:
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        
+        chat_res = _sb.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        if not chat_res.data:
+            return jsonify({"ok": False, "error": "Not found"}), 404
+            
+        _sb.table("chats").update({"title": new_title}).eq("id", chat_id).execute()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print("PATCH /chats/<id> error:", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/generate-title", methods=["POST"])
+def generate_title():
+    data = request.get_json(silent=True) or {}
+    raw = (data.get("message") or "").strip()
+    fallback = data.get("fallback") or ""
+    def _fallback_title(text):
+        cleaned = " ".join((text or "").split())
+        return cleaned[:48].rstrip(" ,.;:-—") or "New chat"
+        
+    if not raw:
+        return jsonify({"title": _fallback_title(fallback)})
+    
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return jsonify({"title": _fallback_title(raw)})
+        
+    try:
+        import requests
+        system = (
+            "You generate short, descriptive titles for chat conversations. "
+            "Given the user's first message, output a 2 to 4 word Title Case label "
+            "summarizing the topic or intent. Do not use quotes, periods, or emojis. "
+            "Examples:\n"
+            "- 'Hi' -> Greetings\n"
+            "- 'how does CRISPR work?' -> CRISPR Gene Editing\n"
+            "- 'help me write a cover letter for a software job' -> Software Cover Letter\n"
+            "- 'What is the capital of France?' -> Capital of France\n"
+            "Output only the title text, nothing else."
+        )
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": raw[:400].replace("\n", " ")}
+            ],
+            "temperature": 0.5,
+            "max_tokens": 15
+        }
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=payload,
+            timeout=5
+        )
+        res.raise_for_status()
+        title = res.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'").rstrip(".")
+        if not title or len(title) > 60:
+            title = _fallback_title(raw)
+        return jsonify({"title": title})
+    except Exception as e:
+        print("generate_title error:", e)
+        return jsonify({"title": _fallback_title(raw)})
 
 
 @app.route("/chats/<chat_id>/title", methods=["PATCH"])

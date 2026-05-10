@@ -33,8 +33,24 @@
             --text-secondary: #A0A0A0;
             --accent: #10b981;
             --accent-hover: #059669;
+            --gradient-start: #10b981;
+            --gradient-end: #059669;
             --radius: 12px;
             --font: 'Bricolage Grotesque', sans-serif;
+        }
+
+        @keyframes pulseOrb {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.7; }
+        }
+        @keyframes thinkingDot {
+            0%, 80%, 100% { transform: scale(0); opacity: 0; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
         * {
@@ -92,6 +108,25 @@
             background: transparent; border: 1px solid var(--border); color: var(--text-primary);
         }
         .btn-outline:hover { background: var(--surface-hover); }
+        /* Auth tab buttons */
+        .auth-tab {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 7px;
+            transition: all 0.2s;
+            font-family: var(--font);
+        }
+        .auth-tab.active {
+            background: var(--surface);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
 
         /* --- Sidebar --- */
         .sidebar {
@@ -132,11 +167,19 @@
         }
         .nav-btn:hover { background: var(--surface-hover); }
         .new-chat-btn {
-            background: var(--text-primary);
-            color: var(--bg);
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            background-size: 200% 200%;
+            color: #ffffff;
             margin-bottom: 24px;
+            font-weight: 600;
+            box-shadow: 0 2px 12px rgba(16, 185, 129, 0.35);
+            transition: all 0.25s ease;
         }
-        .new-chat-btn:hover { background: #e0e0e0; }
+        .new-chat-btn:hover {
+            background: linear-gradient(135deg, var(--gradient-end), var(--gradient-start));
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.5);
+            transform: translateY(-1px);
+        }
         .spacer { flex: 1; }
         .user-profile {
             border-top: 1px solid var(--border);
@@ -520,7 +563,7 @@
         .bubble pre .copy-code-btn { background: transparent; border: 1px solid #30363d; color: #8b949e; padding: 3px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; transition: all 0.15s; font-family: var(--font); }
         .bubble pre .copy-code-btn:hover { background: #21262d; color: #e6edf3; }
         .bubble pre code { display: block; padding: 14px; overflow-x: auto; font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 13px; line-height: 1.6; }
-        .bubble code:not(pre code) { font-family: monospace; background: rgba(99,102,241,0.12); color: #a5b4fc; padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
+        .bubble code:not(pre code) { font-family: monospace; background: rgba(16,185,129,0.12); color: #6ee7b7; padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
         /* Scroll to bottom btn */
         .scroll-btn {
             position: fixed;
@@ -552,19 +595,53 @@
         .scroll-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
         /* Greeting */
         .greeting-text {
-            font-size: 28px;
+            font-size: 30px;
             font-weight: 700;
             margin-bottom: 8px;
-            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            background: linear-gradient(135deg, #ffffff 0%, var(--gradient-start) 50%, var(--gradient-end) 100%);
+            background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            animation: gradientShift 4s ease infinite;
         }
         .greeting-sub {
             font-size: 15px;
             color: var(--text-secondary);
             margin-bottom: 32px;
         }
+        /* Thinking animation */
+        .thinking-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            opacity: 0.7;
+            font-size: 13px;
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+        .thinking-orb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            animation: pulseOrb 1.2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+        .thinking-dots-wrap {
+            display: flex;
+            gap: 4px;
+        }
+        .thinking-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            animation: thinkingDot 1.4s ease-in-out infinite;
+        }
+        .thinking-dot:nth-child(1) { animation-delay: 0s; }
+        .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+        .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
         /* History group labels */
         .history-group-label {
             font-size: 10px;
@@ -582,56 +659,66 @@
         }
         .history-item {
             flex: 1;
-            padding: 8px 32px 8px 12px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
         }
-        .history-delete-btn {
-            position: absolute;
-            right: 6px;
-            top: 50%;
-            transform: translateY(-50%);
+        .history-action-btn {
             background: none;
             border: none;
             color: var(--text-secondary);
             cursor: pointer;
             opacity: 0;
-            padding: 3px 5px;
+            padding: 4px;
             border-radius: 4px;
             font-size: 13px;
             transition: opacity 0.15s, color 0.15s;
             line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .history-item-wrap:hover .history-delete-btn { opacity: 1; }
-        .history-delete-btn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+        .history-item-wrap:hover .history-action-btn { opacity: 1; }
+        .history-action-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
 
         /* --- Suggestions --- */
         .suggestions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            justify-content: center;
-            max-width: 768px;
-            margin: auto auto 24px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            max-width: 640px;
+            margin: 0 auto 24px;
+            padding: 0 16px;
         }
         .suggestion-chip {
             background: var(--surface);
             border: 1px solid var(--border);
-            padding: 12px 16px;
-            border-radius: 20px;
+            padding: 14px 16px;
+            border-radius: 12px;
             color: var(--text-secondary);
-            font-size: 14px;
+            font-size: 13px;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.2s ease;
+            text-align: left;
+            line-height: 1.4;
+            font-family: var(--font);
         }
         .suggestion-chip:hover {
             background: var(--surface-hover);
             color: var(--text-primary);
-            border-color: var(--text-secondary);
+            border-color: rgba(16, 185, 129, 0.5);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+        @media (max-width: 480px) {
+            .suggestions { grid-template-columns: 1fr; }
         }
 
         /* --- Input Area --- */
         .input-area {
-            padding: 16px;
-            background: linear-gradient(180deg, transparent, var(--bg) 20%);
+            padding: 12px 16px 16px;
+            background: var(--bg);
+            border-top: 1px solid var(--border);
         }
         .image-preview-container {
             display: none;
@@ -669,11 +756,27 @@
             background: none; border: none; color: var(--text-secondary);
             font-size: 20px; cursor: pointer; padding: 8px;
             border-radius: 50%; display: grid; place-items: center;
+            transition: all 0.2s;
         }
         .icon-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
-        .icon-btn.send-btn { background: var(--text-primary); color: var(--bg); margin-left: 4px; transition: background-color 0.2s; }
-        .icon-btn.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .icon-btn.send-btn.stop { background: #ef4444; }
+        .icon-btn.send-btn {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: #fff;
+            margin-left: 4px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+        }
+        .icon-btn.send-btn:hover:not(:disabled) {
+            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.6);
+            transform: scale(1.05);
+        }
+        .icon-btn.send-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: var(--surface-hover);
+            box-shadow: none;
+        }
+        .icon-btn.send-btn.stop { background: #ef4444; box-shadow: 0 2px 10px rgba(239,68,68,0.4); }
         
         textarea {
             flex: 1;
@@ -799,38 +902,72 @@
 <body>
 
     <!-- Auth Modal -->
-    <div id="authModal" class="modal-overlay hidden">
-        <div class="modal">
-            <img src="/static/logo.png" alt="Xynth" style="height: 24px; filter: invert(1); margin-bottom: 6px;">
-            <div style="font-size:11px;color:var(--text-secondary);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:20px;">by Tetrific Inc.</div>
-            <h2>Welcome Back</h2>
-            <p>Log in or sign up to continue to Xynth.</p>
-            <!-- Google Sign-In -->
-            <button id="googleAuthBtn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;background:#fff;color:#111;border:1px solid #ddd;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;font-family:var(--font);transition:background 0.2s;">
-                <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                Continue with Google
-            </button>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                <div style="flex:1;height:1px;background:var(--border);"></div>
-                <span style="font-size:12px;color:var(--text-secondary);">or</span>
-                <div style="flex:1;height:1px;background:var(--border);"></div>
-            </div>
-            <input type="email" id="emailInput" placeholder="Email Address">
-            <input type="password" id="passwordInput" placeholder="Password">
-            <button id="loginBtn" class="btn">Log In</button>
-            <button id="signupBtn" class="btn btn-outline">Sign Up</button>
-            <p style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;line-height:1.6;">By signing up you agree to Tetrific's <a href="https://tetrific.com/terms" target="_blank" style="color:var(--accent);text-decoration:none;">Terms</a> &amp; <a href="https://tetrific.com/privacy" target="_blank" style="color:var(--accent);text-decoration:none;">Privacy Policy</a>.</p>
-            <div id="authError" style="color: #ef4444; margin-top: 12px; font-size: 13px;"></div>
-            <button id="forgotPasswordBtn" style="background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;margin-top:12px;font-family:var(--font);">Forgot password?</button>
-            <div id="resetMsg" style="color:#10b981;font-size:13px;margin-top:8px;display:none;">Reset link sent! Check your email.</div>
-            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);text-align:center;">
-                <span style="font-size:12px;color:var(--text-secondary);">Part of the </span>
-                <a href="https://tetrific.com" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--text-secondary);font-weight:600;text-decoration:none;border-bottom:1px solid var(--border);">Tetrific</a>
-                <span style="font-size:12px;color:var(--text-secondary);"> ecosystem</span>
-                <div style="margin-top:12px;display:flex;justify-content:center;gap:12px;">
-                    <a href="https://tetrific.com/terms" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Terms</a>
-                    <a href="https://tetrific.com/privacy" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Privacy</a>
+    <div id="authModal" class="modal-overlay hidden" id="authModalOverlay">
+        <div class="modal" style="max-width:420px;padding:0;overflow:hidden;">
+            <!-- Header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 24px 0;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <img src="/static/logo.png" alt="Xynth" style="height:22px;filter:invert(1);">
+                    <span style="font-size:11px;color:var(--text-secondary);letter-spacing:0.06em;text-transform:uppercase;">by Tetrific</span>
                 </div>
+                <button id="closeAuthBtn" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;border-radius:6px;display:grid;place-items:center;transition:background 0.15s;" title="Close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <!-- Tab switcher -->
+            <div style="display:flex;margin:20px 24px 0;background:var(--bg);border-radius:10px;padding:4px;">
+                <button id="tabLoginBtn" class="auth-tab active" onclick="switchAuthTab('login')">Log In</button>
+                <button id="tabSignupBtn" class="auth-tab" onclick="switchAuthTab('signup')">Create Account</button>
+            </div>
+            <!-- Login Panel -->
+            <div id="authPanelLogin" style="padding:20px 24px 24px;">
+                <button id="googleAuthBtn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;background:#fff;color:#111;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:16px;font-family:var(--font);transition:opacity 0.2s;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                    Continue with Google
+                </button>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="flex:1;height:1px;background:var(--border);"></div>
+                    <span style="font-size:12px;color:var(--text-secondary);">or</span>
+                    <div style="flex:1;height:1px;background:var(--border);"></div>
+                </div>
+                <input type="email" id="emailInput" placeholder="Email Address" style="margin-bottom:10px;">
+                <input type="password" id="passwordInput" placeholder="Password" style="margin-bottom:6px;">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+                    <button id="forgotPasswordBtn" style="background:none;border:none;color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:var(--font);padding:0;">Forgot password?</button>
+                </div>
+                <button id="loginBtn" class="btn" style="background:linear-gradient(135deg,var(--gradient-start),var(--gradient-end));color:#fff;border-radius:10px;">Log In</button>
+                <div id="authError" style="color:#ef4444;margin-top:10px;font-size:13px;text-align:center;"></div>
+                <div id="resetMsg" style="color:#10b981;font-size:13px;margin-top:8px;text-align:center;display:none;">Reset link sent! Check your email.</div>
+                <p style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:14px;line-height:1.6;">
+                    Don't have an account? <button onclick="switchAuthTab('signup')" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;font-family:var(--font);font-weight:600;">Sign up</button>
+                </p>
+            </div>
+            <!-- Signup Panel -->
+            <div id="authPanelSignup" style="padding:20px 24px 24px;display:none;">
+                <button id="googleAuthBtnSignup" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;background:#fff;color:#111;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:16px;font-family:var(--font);transition:opacity 0.2s;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                    Sign up with Google
+                </button>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="flex:1;height:1px;background:var(--border);"></div>
+                    <span style="font-size:12px;color:var(--text-secondary);">or</span>
+                    <div style="flex:1;height:1px;background:var(--border);"></div>
+                </div>
+                <input type="email" id="emailInputSignup" placeholder="Email Address" style="margin-bottom:10px;">
+                <input type="password" id="passwordInputSignup" placeholder="Create a password" style="margin-bottom:4px;">
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5;">By signing up you agree to Tetrific's <a href="https://tetrific.com/terms" target="_blank" style="color:var(--accent);text-decoration:none;">Terms</a> &amp; <a href="https://tetrific.com/privacy" target="_blank" style="color:var(--accent);text-decoration:none;">Privacy Policy</a>.</p>
+                <button id="signupBtn" class="btn" style="background:linear-gradient(135deg,var(--gradient-start),var(--gradient-end));color:#fff;border-radius:10px;">Create Account</button>
+                <div id="signupError" style="color:#ef4444;margin-top:10px;font-size:13px;text-align:center;"></div>
+                <div id="signupSuccess" style="color:#10b981;font-size:13px;margin-top:8px;text-align:center;display:none;">Account created! Check your email to confirm.</div>
+                <p style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:14px;">
+                    Already have an account? <button onclick="switchAuthTab('login')" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;font-family:var(--font);font-weight:600;">Log in</button>
+                </p>
+            </div>
+            <!-- Footer -->
+            <div style="padding:12px 24px;border-top:1px solid var(--border);display:flex;justify-content:center;gap:16px;">
+                <a href="https://tetrific.com/terms" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Terms</a>
+                <a href="https://tetrific.com/privacy" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Privacy</a>
+                <a href="https://tetrific.com" target="_blank" style="color:#555566;font-size:11px;text-decoration:underline;">Tetrific</a>
             </div>
         </div>
     </div>
@@ -866,10 +1003,11 @@
                 <p style="font-size:11px;color:var(--text-secondary);text-align:center;">Unlock unlimited messages</p>
             </div>
             <div id="accountProSection" style="display:none;">
-                <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;color:#10b981;font-size:13px;font-weight:600;">
+                <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;color:#10b981;font-size:13px;font-weight:600;margin-bottom:8px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     Pro Plan Active
                 </div>
+                <button id="manageSubBtn" class="btn btn-outline" style="width:100%;font-size:12px;padding:8px;">Manage Subscription</button>
             </div>
         </div>
     </div>
@@ -899,6 +1037,58 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModalOverlay" class="modal-overlay hidden">
+        <div class="modal" style="max-width:400px;text-align:left;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="font-size:18px;">Settings &amp; Privacy</h2>
+                <button onclick="document.getElementById('settingsModalOverlay').classList.add('hidden')" style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;line-height:1;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600;">Account</div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:13px;color:var(--text-primary);">Signed in as</span>
+                    <span id="settingsEmail" style="font-size:13px;color:var(--text-secondary);"></span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600;">Appearance</div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:13px;color:var(--text-primary);">Theme</span>
+                    <div style="display:flex;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:2px;gap:2px;">
+                        <button id="themeDarkBtn" style="background:var(--accent);color:#062b1f;border:none;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> Dark</button>
+                        <button id="themeLightBtn" style="background:transparent;color:var(--text-secondary);border:none;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> Light</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600;">Privacy &amp; Legal</div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;">
+                    <a href="https://tetrific.com/privacy" target="_blank" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;text-decoration:none;border-bottom:1px solid var(--border);">
+                        <span style="font-size:13px;color:var(--text-primary);">Privacy Policy</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </a>
+                    <a href="https://tetrific.com/terms" target="_blank" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;text-decoration:none;border-bottom:1px solid var(--border);">
+                        <span style="font-size:13px;color:var(--text-primary);">Terms of Service</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </a>
+                    <button id="deleteAccountBtn" style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:none;border:none;cursor:pointer;">
+                        <span style="font-size:13px;color:#ef4444;">Delete my account</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div style="font-size:11px;color:var(--text-secondary);text-align:center;">
+                Xynth can make mistakes. Consider verifying important information.
+            </div>
+        </div>
+    </div>
     <!-- Cookie Consent Banner -->
     <div id="cookieBanner" class="cookie-banner">
         <span>We use cookies to improve your experience. By using Xynth you agree to our <a href="https://tetrific.com/privacy" target="_blank">Privacy Policy</a>.</span>
@@ -928,6 +1118,10 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
             What's New
         </a>
+        <div class="search-box" style="margin: 10px 12px; position: relative;">
+            <svg style="position: absolute; left: 10px; top: 10px; color: var(--text-secondary);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="chatSearchInput" placeholder="Search chats" style="width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text-primary); padding: 8px 12px 8px 30px; border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+        </div>
 
         <div class="chat-list-label">Recent</div>
         <div class="chat-list" id="chatList">
@@ -951,7 +1145,13 @@
         </button>
         <button class="nav-btn" id="settingsBtn" style="display:none;font-size:13px;color:var(--text-secondary);text-align:left;padding:10px 12px;margin-top:2px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Settings
+            Settings &amp; Privacy
+        </button>
+        <button class="nav-btn" id="membershipBtn" style="display:none;font-size:13px;color:var(--accent);text-align:left;padding:10px 12px;margin-top:2px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);">
+            <div style="display:flex;align-items:center;width:100%;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-right:8px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Membership <span style="background:var(--accent);color:#062b1f;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:auto;">PRO</span>
+            </div>
         </button>
         <button class="nav-btn" id="logoutBtn" style="color: #ef4444; display: none; margin-top: 4px;font-size:13px;padding:10px 12px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -978,10 +1178,10 @@
                 <div class="greeting-sub">How can Xynth help you today?</div>
             </div>
             <div id="suggestions" class="suggestions" style="display: none;">
-                <button class="suggestion-chip">⚛️ How does quantum computing threaten encryption?</button>
-                <button class="suggestion-chip">🌍 Latest news in artificial intelligence 2025</button>
-                <button class="suggestion-chip">📊 What causes inflation and how to fight it?</button>
-                <button class="suggestion-chip">🧬 Explain CRISPR gene editing and its risks</button>
+                <button class="suggestion-chip">How does quantum computing threaten encryption?</button>
+                <button class="suggestion-chip">Latest news in artificial intelligence 2025</button>
+                <button class="suggestion-chip">What causes inflation and how to fight it?</button>
+                <button class="suggestion-chip">Explain CRISPR gene editing and its risks</button>
             </div>
             <div class="messages-container" id="messagesContainer"></div>
         </div>
@@ -1077,7 +1277,8 @@
             } else {
                 currentUser = null;
                 currentToken = "";
-                authModal.classList.add('hidden');
+                // NOTE: Do NOT show or hide authModal here — it starts hidden
+                // and is only shown when the user explicitly clicks Log In / Sign Up.
                 document.getElementById('userProfile').style.display = 'none';
                 logoutBtn.style.display = 'none';
                 document.getElementById('accountBtn').style.display = 'none';
@@ -1086,12 +1287,36 @@
             }
         });
 
+        // Auth tab switcher
+        function switchAuthTab(tab) {
+            const isLogin = tab === 'login';
+            document.getElementById('authPanelLogin').style.display = isLogin ? 'block' : 'none';
+            document.getElementById('authPanelSignup').style.display = isLogin ? 'none' : 'block';
+            document.getElementById('tabLoginBtn').classList.toggle('active', isLogin);
+            document.getElementById('tabSignupBtn').classList.toggle('active', !isLogin);
+            // Clear errors
+            document.getElementById('authError').textContent = '';
+            document.getElementById('signupError').textContent = '';
+        }
+
+        // Close auth modal
+        document.getElementById('closeAuthBtn').addEventListener('click', () => {
+            document.getElementById('authModal').classList.add('hidden');
+        });
+        // Click outside to close
+        document.getElementById('authModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('authModal'))
+                document.getElementById('authModal').classList.add('hidden');
+        });
+
         // Sidebar auth buttons open the auth modal
         document.getElementById('sidebarLoginBtn').addEventListener('click', () => {
+            switchAuthTab('login');
             document.getElementById('authModal').classList.remove('hidden');
             document.getElementById('sidebar').classList.remove('open');
         });
         document.getElementById('sidebarSignupBtn').addEventListener('click', () => {
+            switchAuthTab('signup');
             document.getElementById('authModal').classList.remove('hidden');
             document.getElementById('sidebar').classList.remove('open');
         });
@@ -1145,14 +1370,26 @@
             if (error) document.getElementById('authError').textContent = error.message;
         });
 
+        document.getElementById('googleAuthBtnSignup').addEventListener('click', async () => {
+            const { error } = await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: window.location.origin }
+            });
+            if (error) document.getElementById('signupError').textContent = error.message;
+        });
+
         document.getElementById('signupBtn').addEventListener('click', async () => {
-            const email = document.getElementById('emailInput').value;
-            const password = document.getElementById('passwordInput').value;
+            const email = document.getElementById('emailInputSignup').value;
+            const password = document.getElementById('passwordInputSignup').value;
+            const errEl = document.getElementById('signupError');
+            const okEl = document.getElementById('signupSuccess');
+            errEl.textContent = '';
+            okEl.style.display = 'none';
             const { error } = await supabaseClient.auth.signUp({ email, password });
             if (error) {
-                document.getElementById('authError').textContent = error.message;
+                errEl.textContent = error.message;
             } else {
-                document.getElementById('authError').textContent = 'Success! Check your email to confirm.';
+                okEl.style.display = 'block';
                 // Send welcome email
                 fetch('/auth/welcome', {
                     method: 'POST',
@@ -1281,7 +1518,14 @@
             });
         });
 
-        // History Logic — grouped by date with delete
+        let allChats = [];
+        let searchQuery = '';
+
+        document.getElementById('chatSearchInput').addEventListener('input', (e) => {
+            searchQuery = e.target.value.toLowerCase();
+            renderChatHistory();
+        });
+
         async function loadChatHistory() {
             if (!currentToken) return;
             try {
@@ -1289,59 +1533,142 @@
                     headers: { 'Authorization': `Bearer ${currentToken}` },
                     cache: 'no-store'
                 });
-                const chats = await res.json();
-                const chatList = document.getElementById('chatList');
-                chatList.innerHTML = '';
-                if (!chats.length) return;
+                allChats = await res.json();
+                renderChatHistory();
+            } catch (e) { console.error(e); }
+        }
 
-                const now = new Date();
-                const groups = { 'Today': [], 'Yesterday': [], 'Last 7 days': [], 'Older': [] };
-                chats.forEach(chat => {
-                    const d = new Date(chat.created_at);
-                    const diffDays = Math.floor((now - d) / 86400000);
-                    if (diffDays < 1) groups['Today'].push(chat);
-                    else if (diffDays < 2) groups['Yesterday'].push(chat);
-                    else if (diffDays < 7) groups['Last 7 days'].push(chat);
-                    else groups['Older'].push(chat);
-                });
+        function createChatDOM(chat, isPinned) {
+            const wrap = document.createElement('div');
+            wrap.className = 'history-item-wrap';
+            
+            const btn = document.createElement('button');
+            btn.className = 'history-item';
+            btn.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${chat.title}</span>`;
+            if (isPinned) {
+                btn.innerHTML = `<svg style="flex-shrink:0;color:var(--accent);margin-right:4px;" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>` + btn.innerHTML;
+            }
+            if (currentChatId === chat.id) btn.classList.add('active');
+            btn.onclick = () => loadChat(chat.id, btn);
 
-                for (const [label, items] of Object.entries(groups)) {
-                    if (!items.length) continue;
-                    const lbl = document.createElement('div');
-                    lbl.className = 'history-group-label';
-                    lbl.textContent = label;
-                    chatList.appendChild(lbl);
-                    items.forEach(chat => {
-                        const wrap = document.createElement('div');
-                        wrap.className = 'history-item-wrap';
-                        const btn = document.createElement('button');
-                        btn.className = 'history-item';
-                        btn.textContent = chat.title;
-                        btn.onclick = () => loadChat(chat.id, btn);
-                        const del = document.createElement('button');
-                        del.className = 'history-delete-btn';
-                        del.title = 'Delete chat';
-                        del.textContent = '✕';
-                        del.onclick = async (e) => {
-                            e.stopPropagation();
-                            if (!confirm('Delete this chat?')) return;
-                            try {
-                                await fetch(`/chats/${chat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentToken}` } });
-                                wrap.remove();
-                                if (currentChatId === chat.id) {
-                                    currentChatId = '';
-                                    messagesContainer.innerHTML = '';
-                                    document.getElementById('suggestions').style.display = 'flex';
-                                    document.getElementById('landingGreeting').style.display = 'block';
-                                }
-                            } catch(err) { console.error(err); }
-                        };
-                        wrap.appendChild(btn);
-                        wrap.appendChild(del);
-                        chatList.appendChild(wrap);
-                    });
+            const actionsWrap = document.createElement('div');
+            actionsWrap.style.display = 'flex';
+            actionsWrap.style.alignItems = 'center';
+
+            const pinBtn = document.createElement('button');
+            pinBtn.className = 'history-action-btn';
+            pinBtn.innerHTML = isPinned 
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>`
+                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>`;
+            pinBtn.onclick = (e) => {
+                e.stopPropagation();
+                let pinnedIds = [];
+                try { pinnedIds = JSON.parse(localStorage.getItem('xynth_pinned_chats') || '[]'); } catch(e){}
+                if (isPinned) {
+                    pinnedIds = pinnedIds.filter(id => id !== chat.id);
+                } else {
+                    pinnedIds.push(chat.id);
                 }
-            } catch(e) { console.error(e); }
+                localStorage.setItem('xynth_pinned_chats', JSON.stringify(pinnedIds));
+                renderChatHistory();
+            };
+
+            const renameBtn = document.createElement('button');
+            renameBtn.className = 'history-action-btn';
+            renameBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+            renameBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const newTitle = prompt('Rename chat:', chat.title);
+                if (!newTitle || newTitle === chat.title) return;
+                try {
+                    await fetch(`/chats/${chat.id}`, { 
+                        method: 'PATCH', 
+                        headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: newTitle })
+                    });
+                    chat.title = newTitle;
+                    renderChatHistory();
+                } catch(err) { console.error(err); }
+            };
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'history-action-btn';
+            delBtn.innerHTML = '✕';
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (!confirm('Delete this chat?')) return;
+                try {
+                    await fetch(`/chats/${chat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentToken}` } });
+                    allChats = allChats.filter(c => c.id !== chat.id);
+                    if (currentChatId === chat.id) {
+                        currentChatId = '';
+                        messagesContainer.innerHTML = '';
+                        document.getElementById('suggestions').style.display = 'flex';
+                        document.getElementById('landingGreeting').style.display = 'block';
+                    }
+                    renderChatHistory();
+                } catch(err) { console.error(err); }
+            };
+
+            actionsWrap.appendChild(pinBtn);
+            actionsWrap.appendChild(renameBtn);
+            actionsWrap.appendChild(delBtn);
+            
+            wrap.appendChild(btn);
+            wrap.appendChild(actionsWrap);
+            return wrap;
+        }
+
+        function renderChatHistory() {
+            const chatList = document.getElementById('chatList');
+            chatList.innerHTML = '';
+            if (!allChats.length) {
+                chatList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:12px;text-align:center;">No chats yet</div>';
+                return;
+            }
+
+            let visibleChats = allChats;
+            if (searchQuery) {
+                visibleChats = allChats.filter(c => (c.title || 'Untitled').toLowerCase().includes(searchQuery));
+            }
+            if (!visibleChats.length) {
+                chatList.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:12px;text-align:center;">No chats found</div>';
+                return;
+            }
+
+            let pinnedIds = [];
+            try { pinnedIds = JSON.parse(localStorage.getItem('xynth_pinned_chats') || '[]'); } catch(e){}
+
+            const pinned = visibleChats.filter(c => pinnedIds.includes(c.id));
+            const unpinned = visibleChats.filter(c => !pinnedIds.includes(c.id));
+
+            if (pinned.length > 0) {
+                const lbl = document.createElement('div');
+                lbl.className = 'history-group-label';
+                lbl.textContent = 'Pinned';
+                chatList.appendChild(lbl);
+                pinned.forEach(chat => chatList.appendChild(createChatDOM(chat, true)));
+            }
+
+            const now = new Date();
+            const groups = { 'Today': [], 'Yesterday': [], 'Last 7 days': [], 'Older': [] };
+            unpinned.forEach(chat => {
+                const d = new Date(chat.created_at);
+                const diffDays = Math.floor((now - d) / 86400000);
+                if (diffDays < 1) groups['Today'].push(chat);
+                else if (diffDays < 2) groups['Yesterday'].push(chat);
+                else if (diffDays < 7) groups['Last 7 days'].push(chat);
+                else groups['Older'].push(chat);
+            });
+
+            for (const [label, items] of Object.entries(groups)) {
+                if (!items.length) continue;
+                const lbl = document.createElement('div');
+                lbl.className = 'history-group-label';
+                lbl.textContent = label;
+                chatList.appendChild(lbl);
+                items.forEach(chat => chatList.appendChild(createChatDOM(chat, false)));
+            }
         }
 
         async function loadChat(chatId, btnElement) {
@@ -1540,7 +1867,7 @@
 
             appendMessage('user', text, payloadImageData);
             const botBubble = appendMessage('bot', '');
-            botBubble.querySelector('.markdown-body').innerHTML = '<span class="thinking-dots" style="opacity:0.5">Thinking<span class="dots">...</span></span>';
+            botBubble.querySelector('.markdown-body').innerHTML = `<div class="thinking-indicator"><div class="thinking-orb"></div><span>Thinking</span><div class="thinking-dots-wrap"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>`;
 
             const model = modelSelector.value;
             abortController = new AbortController();
@@ -1595,9 +1922,7 @@
                                     chatView.scrollTop = chatView.scrollHeight;
                                 } else if (data.type === 'status') {
                                     if (!fullText) {
-                                        botBubble.querySelector('.markdown-body').innerHTML = `<div style="display:flex;align-items:center;gap:8px;opacity:0.7;font-style:italic;font-size:13px">
-                                            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite"></span>
-                                            ${data.text}</div>`;
+                                        botBubble.querySelector('.markdown-body').innerHTML = `<div class="thinking-indicator"><div class="thinking-orb"></div><span>${data.text}</span><div class="thinking-dots-wrap"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>`;
                                     }
                                 } else if (data.type === 'sources') {
                                     // Inject a sources panel after the answer renders
@@ -1619,7 +1944,7 @@
                                     const btn = document.createElement('a');
                                     btn.href = data.url;
                                     btn.download = (data.title || 'research') + '.pdf';
-                                    btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:8px 16px;background:linear-gradient(135deg,#7c5cfc,#5c8dfc);color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500';
+                                    btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:8px 16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500';
                                     btn.innerHTML = '📄 Download PDF Report';
                                     botBubble.appendChild(btn);
                                 } else if (data.type === 'chat_id') {
@@ -1627,15 +1952,22 @@
                                     loadChatHistory();
                                     // Auto-generate title from first user message
                                     if (currentToken && text) {
-                                        const autoTitle = text.trim().replace(/\s+/g, ' ').slice(0, 60);
-                                        fetch(`/chats/${currentChatId}/title`, {
-                                            method: 'PATCH',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'Authorization': `Bearer ${currentToken}`
-                                            },
-                                            body: JSON.stringify({ title: autoTitle })
-                                        }).then(() => loadChatHistory()).catch(() => {});
+                                        fetch('/api/generate-title', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ message: text.trim(), fallback: "New chat" })
+                                        })
+                                        .then(res => res.json())
+                                        .then(d => {
+                                            fetch(`/chats/${currentChatId}/title`, {
+                                                method: 'PATCH',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Authorization': `Bearer ${currentToken}`
+                                                },
+                                                body: JSON.stringify({ title: d.title || "New chat" })
+                                            }).then(() => loadChatHistory()).catch(() => {});
+                                        }).catch(() => {});
                                     }
                                 } else if (data.type === 'model') {
                                     modelSelector.value = data.name;

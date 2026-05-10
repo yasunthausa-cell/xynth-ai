@@ -9,7 +9,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap"
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <style>
         :root {
             --bg: #0a0a0f;
@@ -93,7 +92,7 @@
             display: inline-block;
             background: var(--accent-glow);
             border: 1px solid var(--accent);
-            color: #a5b4fc;
+            color: #6ee7b7;
             padding: 4px 14px;
             border-radius: 20px;
             font-size: 12px;
@@ -374,7 +373,7 @@
     </nav>
 
     <div class="hero">
-        <div class="hero-badge">Simple Pricing</div>
+        <div class="hero-badge">Everything you need, Nothing you don't.</div>
         <h1>Research without limits.</h1>
         <p>Start free. Upgrade when you need more power.</p>
     </div>
@@ -516,8 +515,7 @@
             </ul>
             <button class="plan-btn pro-btn" id="upgradeBtn"
                 style="display:flex;align-items:center;justify-content:center;gap:8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                    stroke-linecap="round" stroke-linejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                     <polyline points="17 6 23 6 23 12" />
                 </svg>
@@ -584,9 +582,8 @@
         &nbsp;·&nbsp; <a href="https://tetrific.com/terms" target="_blank" style="color:var(--muted);">Terms of
             Service</a>
         &nbsp;·&nbsp; <a href="https://tetrific.com/privacy" target="_blank" style="color:var(--muted);">Privacy
-        Policy</a>
-    &nbsp;·&nbsp; <a href="https://tetrific.com/refund" target="_blank" style="color:var(--muted);">Refund Policy</a>
-</footer>
+            Policy</a>
+    </footer>
 
     <div class="toast" id="toast"></div>
 
@@ -595,15 +592,7 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHFpZ3B3b2Fld2RyeWxlc3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTk4NDcsImV4cCI6MjA5MzA5NTg0N30.zmcXsds_nFWjpPdh9V_RtpMV3HNrR4Dgk9VsuZ8Jd8Y";
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const PADDLE_CLIENT_TOKEN = "{{ paddle_client_token }}";
-        const PADDLE_PRO_PRICE_ID = "{{ paddle_pro_price_id }}";
-
         let currentUser = null;
-
-        // Init Paddle — sandbox auto-detected from test_ token prefix
-        if (PADDLE_CLIENT_TOKEN) {
-            Paddle.Setup({ token: PADDLE_CLIENT_TOKEN });
-        }
 
         function showToast(msg, duration = 4000) {
             const t = document.getElementById('toast');
@@ -625,26 +614,23 @@
                 return;
             }
 
-            if (!PADDLE_CLIENT_TOKEN || !PADDLE_PRO_PRICE_ID) {
-                showToast('Payment system is being set up. Check back soon!');
-                return;
-            }
-
             const btn = document.getElementById('upgradeBtn');
             btn.disabled = true;
             btn.textContent = 'Opening checkout…';
 
             try {
-                Paddle.Checkout.open({
-                    items: [{ priceId: PADDLE_PRO_PRICE_ID, quantity: 1 }],
-                    customer: { email: session.user.email },
-                    customData: { user_id: session.user.id },
-                    settings: {
-                        displayMode: 'overlay',
-                        theme: 'dark',
-                        successUrl: window.location.origin + '/?upgraded=1',
-                    }
+                const response = await fetch('/polar/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: session.user.id })
                 });
+                
+                const data = await response.json();
+                if (data.url) {
+                    window.location.href = data.url;
+                } else {
+                    showToast(data.error || 'Could not open checkout. Please try again.');
+                }
             } catch (e) {
                 showToast('Could not open checkout. Please try again.');
                 console.error(e);
