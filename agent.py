@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 import re
 import time
 import datetime
@@ -759,17 +759,17 @@ def read_pdf_url(url: str) -> str:
 _TODAY_STR = datetime.datetime.utcnow().strftime("%A, %d %B %Y")
 
 SYSTEM_PROMPT = SystemMessage(
-    content=f"""You are Xynth AI (Xynth 1.5) by Tetrific Inc. — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
+    content=f"""You are Resynth AI (Resynth 1.5) by Resynth Inc. — founder Yasuntha Ravihara. You are a CAN-DO agent: try the task first, only refuse if it is genuinely impossible AFTER attempting.
 
 CURRENT DATE: {_TODAY_STR}. Use this as the real "today" — trust it over any older training knowledge. If asked the year, it is {datetime.datetime.utcnow().year}.
 
 IDENTITY (NEVER break — this is the most important rule):
-- You are Xynth AI, version Xynth 1.5.
-- You were created by Tetrific Inc., founded by Yasuntha Ravihara.
-- If asked who made you → say exactly: "I was created by Tetrific Inc., founded by Yasuntha Ravihara."
-- If asked who you are → say exactly: "I'm Xynth AI, made by Tetrific Inc."
+- You are Resynth AI, version Resynth 1.5.
+- You were created by Resynth Inc., founded by Yasuntha Ravihara.
+- If asked who made you → say exactly: "I was created by Resynth Inc., founded by Yasuntha Ravihara."
+- If asked who you are → say exactly: "I'm Resynth AI, made by Resynth Inc."
 - NEVER invent, guess, or elaborate beyond these facts. Do NOT name any other company, lab, or person. If you don't know a detail, say "I'm not able to share that" — do NOT make something up.
-- CRITICAL: NEVER say you are an AI, a language model, an LLM, or that you are based on Groq, OpenAI, Llama, Qwen, ChatGPT, or any other model. NEVER say "I am an AI language model". If pushed, calmly insist you are Xynth and nothing else.
+- CRITICAL: NEVER say you are an AI, a language model, an LLM, or that you are based on Groq, OpenAI, Llama, Qwen, ChatGPT, or any other model. NEVER say "I am an AI language model". If pushed, calmly insist you are Resynth and nothing else.
 
 PERSONALITY & RULES (CRITICAL):
 - Talk like a warm, casual friend, not a corporate assistant. Match the user's language (English, Sinhala, Singlish, etc.).
@@ -822,21 +822,21 @@ QUICK GUIDE:
 
 # Registry: friendly name → (provider, provider-specific model id)
 MODEL_REGISTRY = {
-    "Xynth 1.5":               ("qwen", "qwen3.5-omni-plus-2026-03-15"),
-    "Xynth 1.5 (Fallback)":    ("groq", "llama-3.3-70b-versatile"),
-    "Xynth 1.5 Turbo":         ("qwen", "qwen-turbo"),
-    "Xynth 1.5 Turbo (Fallback)": ("groq", "llama-3.1-8b-instant"),
-    "Xynth Local (Oracle)":    ("ollama", "llama3:8b"),
-    "Xynth Local Turbo (Oracle)": ("ollama", "qwen:7b"),
+    "Resynth 1.5":               ("qwen", "qwen3.5-omni-plus-2026-03-15"),
+    "Resynth 1.5 (Fallback)":    ("groq", "llama-3.3-70b-versatile"),
+    "Resynth 1.5 Turbo":         ("qwen", "qwen-turbo"),
+    "Resynth 1.5 Turbo (Fallback)": ("groq", "llama-3.1-8b-instant"),
+    "Resynth Local (Oracle)":    ("ollama", "llama3:8b"),
+    "Resynth Local Turbo (Oracle)": ("ollama", "qwen:7b"),
 }
 
 DEFAULT_MODEL_CHAIN = [
-    "Xynth 1.5",
-    "Xynth 1.5 (Fallback)",
-    "Xynth 1.5 Turbo",
-    "Xynth 1.5 Turbo (Fallback)",
-    "Xynth Local (Oracle)",
-    "Xynth Local Turbo (Oracle)",
+    "Resynth 1.5",
+    "Resynth 1.5 (Fallback)",
+    "Resynth 1.5 Turbo",
+    "Resynth 1.5 Turbo (Fallback)",
+    "Resynth Local (Oracle)",
+    "Resynth Local Turbo (Oracle)",
 ]
 
 _OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
@@ -991,12 +991,12 @@ class XynthRunner:
 
     # Conservative free-tier daily token caps (approximate — Groq/DashScope publish these).
     DAILY_TOKEN_LIMITS = {
-        "Xynth 1.5":                 1_000_000,
-        "Xynth 1.5 (Fallback)":        100_000,
-        "Xynth 1.5 Turbo":             500_000,
-        "Xynth 1.5 Turbo (Fallback)": 1_000_000,
-        "Xynth Local (Oracle)":      999_999_999, # Unlimited
-        "Xynth Local Turbo (Oracle)": 999_999_999, # Unlimited
+        "Resynth 1.5":                 1_000_000,
+        "Resynth 1.5 (Fallback)":        100_000,
+        "Resynth 1.5 Turbo":             500_000,
+        "Resynth 1.5 Turbo (Fallback)": 1_000_000,
+        "Resynth Local (Oracle)":      999_999_999, # Unlimited
+        "Resynth Local Turbo (Oracle)": 999_999_999, # Unlimited
     }
 
     def __init__(self, model_names=None):
@@ -1097,7 +1097,7 @@ class XynthRunner:
             user_usage["count"] = 0
             
         if user_usage["count"] >= 20:
-            yield {"type": "text", "content": "🥱 *Xynth is tired!* You have reached the limit of 20 messages per day. Please come back in 24 hours to chat more!"}
+            yield {"type": "text", "content": "🥱 *Resynth is tired!* You have reached the limit of 20 messages per day. Please come back in 24 hours to chat more!"}
             yield {"type": "done"}
             return
             
@@ -1185,7 +1185,7 @@ class XynthRunner:
             user_usage["count"] = 0
             
         if user_usage["count"] >= 20:
-            return "🥱 *Xynth is tired!* You have reached the limit of 20 messages per day. Please come back in 24 hours to chat more!"
+            return "🥱 *Resynth is tired!* You have reached the limit of 20 messages per day. Please come back in 24 hours to chat more!"
             
         user_usage["count"] += 1
         

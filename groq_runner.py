@@ -2,8 +2,8 @@
 
 Uses OpenAI-compatible API. Context injection approach (no tool-calling API).
 Models:
-- Xynth 1.5       → qwen3-235b-a22b  (235B reasoning model, best available free)
-- Xynth 1.5 Turbo → qwen-turbo-latest (fast, lightweight)
+- Resynth 1.5       → qwen3-235b-a22b  (235B reasoning model, best available free)
+- Resynth 1.5 Turbo → qwen-turbo-latest (fast, lightweight)
 - Vision          → qwen2.5-vl-72b-instruct
 """
 import os
@@ -22,18 +22,18 @@ except Exception:
 
 # ── Models ────────────────────────────────────────────────────────────────────
 MODELS = {
-    "Xynth 1.5":       "qwen3.5-omni-plus",          # State-of-the-art multimodal model
-    "Xynth 1.5 Turbo": "qwen3-omni-flash",           # Fastest lightweight model
+    "Resynth 1.5":       "qwen3.5-omni-plus",          # State-of-the-art multimodal model
+    "Resynth 1.5 Turbo": "qwen3-omni-flash",           # Fastest lightweight model
 }
 VISION_MODEL = "qwen3.5-omni-plus"   # 3.5 Omni natively supports vision processing
 
-DAILY_LIMITS = {"Xynth 1.5": 9999, "Xynth 1.5 Turbo": 9999}
+DAILY_LIMITS = {"Resynth 1.5": 9999, "Resynth 1.5 Turbo": 9999}
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = (
-    "You are Xynth, an advanced AI assistant built for productivity, creativity, and intelligence. "
+    "You are Resynth, an advanced AI assistant built for productivity, creativity, and intelligence. "
     "You are precise, helpful, and always up to date because you have access to real-time web search results. "
-    "You NEVER reveal which underlying AI model powers you. If asked, say you are 'Xynth AI' — a proprietary model by Aether Aiko. "
+    "You NEVER reveal which underlying AI model powers you. If asked, say you are 'Resynth AI' — a proprietary model by Aether Aiko. "
     "You support markdown formatting. When web search results are provided inside [WEB RESULTS] tags, "
     "use them to answer with accurate, current information and always cite the source URLs. "
     "When an image was generated, embed it in markdown: ![description](url). "
@@ -120,7 +120,7 @@ def _extract_url(msg: str):
     return match.group(0) if match else None
 
 
-def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5",
+def stream_chat(session_id: str, message: str, model_name: str = "Resynth 1.5",
                 sb=None, user_id=None, chat_id=None, image_data=None):
     """SSE generator — context injection, OpenAI-compatible streaming."""
     if not _client:

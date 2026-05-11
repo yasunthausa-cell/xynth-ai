@@ -1,4 +1,4 @@
-"""Persistent task scheduler for Xynth AI.
+"""Persistent task scheduler for Resynth AI.
 
 A single APScheduler instance runs in-process. Jobs are persisted to SQLite so
 they survive workflow restarts. When a job fires, it runs a prompt through the

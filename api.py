@@ -1,9 +1,11 @@
-"""HTTP API for Xynth AI.
+"""HTTP API for Resynth AI.
 - POST /chat       → JSON {session_id, message} → {response}
 - POST /whatsapp   → Twilio WhatsApp webhook (form-encoded). Replies asynchronously.
 - GET  /health
 """
 import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 import io
 import json
 import base64
@@ -32,17 +34,52 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_me
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 # ── Supabase (optional – gracefully disabled if keys missing) ────────────────
+_SB_URL = os.environ.get("SUPABASE_URL", "")
+_SB_KEY = os.environ.get("SUPABASE_KEY", "")
+
 try:
     from supabase import create_client as _sb_create
-    _SB_URL = os.environ.get("SUPABASE_URL", "")
-    _SB_KEY = os.environ.get("SUPABASE_KEY", "")
     _sb = _sb_create(_SB_URL, _SB_KEY) if _SB_URL and _SB_KEY else None
-except Exception:
+except Exception as e:
+    print("Supabase init error:", e)
     _sb = None
+
+def _get_auth_client(token: str):
+    if not _SB_URL or not _SB_KEY: return None
+    try:
+        from supabase import ClientOptions
+        opts = ClientOptions(headers={"Authorization": f"Bearer {token}"})
+        return _sb_create(_SB_URL, _SB_KEY, options=opts)
+    except Exception:
+        pass
+    
+    client = _sb_create(_SB_URL, _SB_KEY)
+    try:
+        client.postgrest.auth(token)
+    except Exception:
+        pass
+    try:
+        client.postgrest.session.headers["Authorization"] = f"Bearer {token}"
+    except Exception:
+        pass
+    return client
+
+def _get_user_id(token: str):
+    """Bypass supabase SDK to get user ID from token."""
+    if not _SB_URL or not _SB_KEY: return None
+    import requests
+    headers = {"apikey": _SB_KEY, "Authorization": f"Bearer {token}"}
+    try:
+        r = requests.get(f"{_SB_URL}/auth/v1/user", headers=headers, timeout=5)
+        if r.status_code == 200:
+            return r.json().get("id")
+    except Exception:
+        pass
+    return None
 
 app = Flask(__name__)
 sock = Sock(app)
-print("🚀 Initialising Xynth model chain…")
+print("🚀 Initialising Resynth model chain…")
 runner = XynthRunner()
 print(f"Meta WA configured: {_msg.configured()}")
 
@@ -300,23 +337,19 @@ def chat_stream():
         data = request.get_json(silent=True) or {}
         session_id = str(data.get("session_id", "default"))
         message    = (data.get("message") or "").strip()
-        model      = (data.get("model")   or "Xynth 1.5").strip()
+        model      = (data.get("model")   or "Resynth 1.5").strip()
         chat_id    = str(data.get("chat_id", ""))
         image_data = data.get("image_data", None)
 
         deep_dive  = bool(data.get("deep_dive", False))
 
         user_id = None
-        if _sb:
+        current_token = None
+        if _SB_URL:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-                try:
-                    user_res = _sb.auth.get_user(token)
-                    if user_res and user_res.user:
-                        user_id = user_res.user.id
-                except Exception as e:
-                    print("Auth error:", e)
+                current_token = auth_header.split(" ")[1]
+                user_id = _get_user_id(current_token)
 
         if not message:
             return Response(
@@ -348,14 +381,14 @@ def chat_stream():
             if image_data:
                 yield from _cf.stream_chat(
                     session_id=session_id, message=message,
-                    model_name=model, sb=_sb, user_id=user_id,
+                    model_name=model, token=current_token, user_id=user_id,
                     chat_id=chat_id, image_data=image_data
                 )
             else:
                 # All text queries → research engine
                 yield from _research.stream_research(
                     session_id=session_id, query=message,
-                    sb=_sb, user_id=user_id, chat_id=chat_id,
+                    jwt_token=current_token, user_id=user_id, chat_id=chat_id,
                     deep_dive=deep_dive
                 )
 
@@ -438,7 +471,7 @@ def polar_create_checkout():
 
     payload = {
         "products": [POLAR_PRO_PRODUCT_ID],
-        "metadata": {"user_id": user_id, "app": "xynth-web"},
+        "metadata": {"user_id": user_id, "app": "resynth-web"},
     }
     headers = {
         "Authorization": f"Bearer {POLAR_ACCESS_TOKEN}",
@@ -510,65 +543,106 @@ def polar_customer_portal():
 
 @app.route("/chats", methods=["GET"])
 def get_chats():
-    if not _sb: return jsonify([])
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "): return jsonify([])
-    token = auth_header.split(" ")[1]
     try:
-        user_res = _sb.auth.get_user(token)
-        if not user_res or not user_res.user: return jsonify([])
-        res = _sb.table("chats").select("id, title, created_at").eq("user_id", user_res.user.id).order("created_at", desc=True).execute()
-        return jsonify(res.data)
+        try:
+            url = _SB_URL
+            key = _SB_KEY
+        except NameError:
+            url = os.environ.get("SUPABASE_URL", "")
+            key = os.environ.get("SUPABASE_KEY", "")
+        
+        if not url or not key: return jsonify([])
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "): return jsonify([])
+        token = auth_header.split(" ")[1]
+        
+        user_id = _get_user_id(token)
+        if not user_id: return jsonify([])
+        
+        import requests
+        headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        url = f"{url}/rest/v1/chats?user_id=eq.{user_id}&order=created_at.desc"
+        r = requests.get(url, headers=headers)
+        if r.status_code == 200:
+            return jsonify(r.json())
+        else:
+            return jsonify({"error": "REST error", "details": r.text}), 500
     except Exception as e:
-        print("GET /chats error:", e)
-        return jsonify([])
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.route("/chats/<chat_id>", methods=["GET"])
 def get_chat_messages(chat_id):
-    if not _sb: return jsonify([])
+    if not _SB_URL or not _SB_KEY: return jsonify([])
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "): return jsonify([])
     token = auth_header.split(" ")[1]
     try:
-        user_res = _sb.auth.get_user(token)
-        if not user_res or not user_res.user: return jsonify([])
-        # Verify ownership
-        chat_res = _sb.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
-        if not chat_res.data: return jsonify([])
+        user_id = _get_user_id(token)
+        if not user_id: return jsonify([])
         
-        res = _sb.table("messages").select("role, content, created_at").eq("chat_id", chat_id).order("created_at").execute()
-        return jsonify(res.data)
+        # Direct REST to bypass RLS SDK issues
+        import requests
+        headers = {
+            "apikey": _SB_KEY,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        # First verify ownership
+        check_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}&user_id=eq.{user_id}&select=id"
+        r_check = requests.get(check_url, headers=headers)
+        if r_check.status_code != 200 or not r_check.json():
+            return jsonify([])
+            
+        msg_url = f"{_SB_URL}/rest/v1/messages?chat_id=eq.{chat_id}&order=created_at.asc&select=role,content,created_at"
+        r_msg = requests.get(msg_url, headers=headers)
+        if r_msg.status_code == 200:
+            return jsonify(r_msg.json())
+        return jsonify([])
     except Exception as e:
         print("GET /chats/<id> error:", e)
         return jsonify([])
 
 @app.route("/chats/<chat_id>", methods=["DELETE"])
 def delete_chat(chat_id):
-    """Delete a chat and all its messages (ownership verified)."""
-    if not _sb: return jsonify({"ok": False}), 503
+    if not _SB_URL or not _SB_KEY: return jsonify({"ok": False}), 503
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     token = auth_header.split(" ")[1]
     try:
-        user_res = _sb.auth.get_user(token)
-        if not user_res or not user_res.user:
+        user_id = _get_user_id(token)
+        if not user_id:
             return jsonify({"ok": False, "error": "Unauthorized"}), 401
-        # Verify ownership before deleting
-        chat_res = _sb.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
-        if not chat_res.data:
+            
+        import requests
+        headers = {
+            "apikey": _SB_KEY,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        # Verify ownership
+        check_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}&user_id=eq.{user_id}&select=id"
+        r_check = requests.get(check_url, headers=headers)
+        if r_check.status_code != 200 or not r_check.json():
             return jsonify({"ok": False, "error": "Not found"}), 404
-        _sb.table("messages").delete().eq("chat_id", chat_id).execute()
-        _sb.table("chats").delete().eq("id", chat_id).execute()
+            
+        # Delete messages then chat
+        requests.delete(f"{_SB_URL}/rest/v1/messages?chat_id=eq.{chat_id}", headers=headers)
+        requests.delete(f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}", headers=headers)
         return jsonify({"ok": True})
     except Exception as e:
         print("DELETE /chats/<id> error:", e)
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/chats/<chat_id>", methods=["PATCH"])
+@app.route("/chats/<chat_id>/title", methods=["PATCH"])
 def rename_chat(chat_id):
-    """Rename a chat (ownership verified)."""
-    if not _sb: return jsonify({"ok": False}), 503
+    if not _SB_URL or not _SB_KEY: return jsonify({"ok": False}), 503
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
@@ -578,19 +652,65 @@ def rename_chat(chat_id):
     if not new_title:
         return jsonify({"ok": False, "error": "Missing title"}), 400
     try:
-        user_res = _sb.auth.get_user(token)
-        if not user_res or not user_res.user:
+        user_id = _get_user_id(token)
+        if not user_id:
             return jsonify({"ok": False, "error": "Unauthorized"}), 401
-        
-        chat_res = _sb.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
-        if not chat_res.data:
+            
+        import requests
+        headers = {
+            "apikey": _SB_KEY,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        check_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}&user_id=eq.{user_id}&select=id"
+        r_check = requests.get(check_url, headers=headers)
+        if r_check.status_code != 200 or not r_check.json():
             return jsonify({"ok": False, "error": "Not found"}), 404
             
-        _sb.table("chats").update({"title": new_title}).eq("id", chat_id).execute()
+        patch_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}"
+        requests.patch(patch_url, headers=headers, json={"title": new_title})
         return jsonify({"ok": True})
     except Exception as e:
         print("PATCH /chats/<id> error:", e)
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/test_auth", methods=["GET"])
+def test_auth():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "No Bearer token"})
+    token = auth_header.split(" ")[1]
+    
+    diag = {"token_prefix": token[:10], "sb_exists": bool(_sb)}
+    if not _sb: return jsonify(diag)
+    
+    try:
+        user_res = _sb.auth.get_user(token)
+        diag["user_id"] = user_res.user.id if user_res and user_res.user else None
+    except Exception as e:
+        diag["get_user_error"] = str(e)
+        return jsonify(diag)
+        
+    try:
+        auth_client = _get_auth_client(token)
+        diag["auth_client_created"] = True
+        
+        # Test 1: Fetch chats
+        res = auth_client.table("chats").select("id, title").limit(5).execute()
+        diag["chats_fetched"] = len(res.data)
+        diag["chats_sample"] = res.data
+        
+        # Test 2: Try to insert a dummy chat
+        ins = auth_client.table("chats").insert({"user_id": diag["user_id"], "title": "Diag Test Chat"}).execute()
+        diag["chat_inserted"] = bool(ins.data)
+        if ins.data:
+            auth_client.table("chats").delete().eq("id", ins.data[0]["id"]).execute()
+            
+    except Exception as e:
+        diag["query_error"] = str(e)
+        
+    return jsonify(diag)
 
 @app.route("/api/generate-title", methods=["POST"])
 def generate_title():
@@ -711,19 +831,19 @@ def send_welcome_email():
         import requests as _req
         payload = {
             "Messages": [{
-                "From": {"Email": "hello@tetrific.com", "Name": "Xynth AI"},
+                "From": {"Email": "hello@resynth.com", "Name": "Resynth AI"},
                 "To":   [{"Email": email, "Name": name}],
-                "Subject": "Welcome to Xynth AI 🔮",
+                "Subject": "Welcome to Resynth AI 🔮",
                 "HTMLPart": f"""
                 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:auto;background:#0a0a0f;color:#fff;border-radius:16px;padding:40px;">
-                  <div style="font-size:28px;font-weight:800;margin-bottom:8px;">Welcome to Xynth, {name}. 🔮</div>
+                  <div style="font-size:28px;font-weight:800;margin-bottom:8px;">Welcome to Resynth, {name}. 🔮</div>
                   <div style="color:#8888aa;font-size:15px;line-height:1.7;margin-bottom:28px;">
                     You now have access to a research AI that searches the live web, cites every source, and thinks deeply on any topic.<br><br>
                     You start with <strong style="color:#fff">20 free messages per day</strong>. Upgrade to Pro for unlimited access.
                   </div>
-                  <a href="https://xynth-ai-production.up.railway.app" style="display:inline-block;background:#fff;color:#0a0a0f;font-weight:700;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;">Open Xynth →</a>
+                  <a href="https://resynth-ai-production.up.railway.app" style="display:inline-block;background:#fff;color:#0a0a0f;font-weight:700;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;">Open Resynth →</a>
                   <div style="margin-top:40px;padding-top:20px;border-top:1px solid #1f1f2e;color:#555566;font-size:12px;">
-                    © 2026 Tetrific Inc. · <a href="https://xynth-ai-production.up.railway.app/pricing" style="color:#555566;">Upgrade to Pro</a>
+                    © 2026 Resynth Inc. · <a href="https://resynth-ai-production.up.railway.app/pricing" style="color:#555566;">Upgrade to Pro</a>
                   </div>
                 </div>
                 """

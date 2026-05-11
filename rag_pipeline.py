@@ -1,4 +1,4 @@
-"""rag_pipeline.py — RAG (Retrieval Augmented Generation) for Xynth Research.
+"""rag_pipeline.py — RAG (Retrieval Augmented Generation) for Resynth Research.
 
 Handles:
 - PDF/text document ingestion with LangChain

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Xynth Builder</title>
+<title>Resynth Builder</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -128,7 +128,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
 <!-- Top bar -->
 <div class="topbar">
-  <div class="logo">Xynth <span>Builder</span></div>
+  <div class="logo">Resynth <span>Builder</span></div>
   <svg width="1" height="20" style="background:var(--border);flex-shrink:0"></svg>
   <input class="project-name" id="projectName" value="Untitled Project" />
   <div class="topbar-actions">
@@ -182,7 +182,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
       <div class="empty-state" id="emptyState">
         <div class="icon">🏗️</div>
         <h3>Nothing built yet</h3>
-        <p>Describe your app in the chat and Xynth will build it live right here</p>
+        <p>Describe your app in the chat and Resynth will build it live right here</p>
       </div>
       <iframe id="previewIframe" style="display:none"></iframe>
     </div>
@@ -199,7 +199,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
     <p>Make your creation live on the internet with a shareable link.</p>
     <div class="price">$5 <span>/ month</span></div>
     <ul style="color:var(--text2);font-size:14px;line-height:2;list-style:none;">
-      <li>✅ Live URL: <strong style="color:var(--text)">yourapp.xynth.app</strong></li>
+      <li>✅ Live URL: <strong style="color:var(--text)">yourapp.resynth.app</strong></li>
       <li>✅ Unlimited updates</li>
       <li>✅ Up to 3 published sites</li>
       <li>✅ SSL included</li>
@@ -330,7 +330,7 @@ document.getElementById('downloadBtn').onclick = () => {
   const blob = new Blob([currentCode], { type: 'text/html' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (document.getElementById('projectName').value || 'xynth-app') + '.html';
+  a.download = (document.getElementById('projectName').value || 'resynth-app') + '.html';
   a.click();
 };
 

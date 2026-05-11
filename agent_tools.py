@@ -1,6 +1,6 @@
-"""agent_tools.py — Full tool registry for Xynth Superagent.
+"""agent_tools.py — Full tool registry for Resynth Superagent.
 
-All tools Xynth can use:
+All tools Resynth can use:
 - run_python     : Execute Python code in a sandbox (auto-installs missing packages)
 - web_search     : DuckDuckGo search via Playwright
 - scrape_page    : Full page scraping via Playwright

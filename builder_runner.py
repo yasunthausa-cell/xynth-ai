@@ -1,4 +1,4 @@
-"""builder_runner.py — AI code generation engine for Xynth Builder.
+"""builder_runner.py — AI code generation engine for Resynth Builder.
 
 Generates complete, self-contained HTML/CSS/JS apps from user descriptions.
 Uses qwen-max with a specialized builder system prompt.
@@ -29,7 +29,7 @@ except Exception:
 BUILDER_MODEL       = "qwen-max"
 BUILDER_MODEL_GROQ  = "llama-3.3-70b-versatile"
 
-BUILDER_SYSTEM_PROMPT = """You are Xynth Builder, an expert web developer AI.
+BUILDER_SYSTEM_PROMPT = """You are Resynth Builder, an expert web developer AI.
 Your ONLY job is to generate complete, stunning, production-quality web apps as a single self-contained HTML file.
 
 STRICT RULES:

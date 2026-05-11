@@ -1,4 +1,4 @@
-"""browser_tools.py — Web search and scraping tools for Xynth AI.
+"""browser_tools.py — Web search and scraping tools for Resynth AI.
 
 - web_search : DuckDuckGo instant API (~200ms, no browser)
 - scrape_page: Playwright full browser for specific URL scraping

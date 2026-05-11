@@ -1,4 +1,4 @@
-"""Interactive CLI for Xynth AI. For programmatic / WhatsApp access, run api.py instead."""
+"""Interactive CLI for Resynth AI. For programmatic / WhatsApp access, run api.py instead."""
 import sys
 import threading
 import itertools
@@ -11,7 +11,7 @@ class Spinner:
 
     FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
-    def __init__(self, message: str = "🤖 Xynth is thinking"):
+    def __init__(self, message: str = "🤖 Resynth is thinking"):
         self.message = message
         self._stop = threading.Event()
         self._thread = None
@@ -42,7 +42,7 @@ class Spinner:
 
 def main():
     print("=" * 60)
-    print("🤖🚀 Xynth AI - The Superagent")
+    print("🤖🚀 Resynth AI - The Superagent")
     print("=" * 60)
 
     try:
@@ -61,7 +61,7 @@ def main():
                 continue
             low = user_query.lower()
             if low in ("exit", "quit"):
-                print("👋 Xynth AI powering down…")
+                print("👋 Resynth AI powering down…")
                 break
             if low == "reset":
                 runner.seen_sessions.clear()
@@ -93,12 +93,12 @@ def main():
                     print(f"✅ Switched to {runner.current_model}\n")
                 continue
 
-            with Spinner(f"🤖 Xynth ({runner.current_model}) is thinking"):
+            with Spinner(f"🤖 Resynth ({runner.current_model}) is thinking"):
                 reply = runner.run("cli-session", user_query)
-            print(f"✨ Xynth AI: {reply}\n")
+            print(f"✨ Resynth AI: {reply}\n")
 
         except KeyboardInterrupt:
-            print("\n👋 Xynth AI powering down…")
+            print("\n👋 Resynth AI powering down…")
             break
         except Exception as e:
             print(f"\n❌ An error occurred: {str(e)}\n")

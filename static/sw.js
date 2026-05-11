@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xynth-ai-cache-v1';
+const CACHE_NAME = 'resynth-ai-cache-v1';
 const urlsToCache = [
   '/',
   '/static/logo.png',

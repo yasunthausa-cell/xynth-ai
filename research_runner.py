@@ -1,4 +1,4 @@
-"""research_runner.py — Deep research engine for Xynth.
+"""research_runner.py — Deep research engine for Resynth.
 
 Architecture:
 1. Decompose user query into sub-queries
@@ -35,7 +35,7 @@ PRIMARY_MODEL = "qwen3.5-omni-plus"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
 FAST_MODEL    = "qwen3-omni-flash"
 
-RESEARCH_SYSTEM_PROMPT = """You are Xynth Research, an advanced AI research assistant for students and professionals.
+RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant for students and professionals.
 
 STRUCTURE YOUR RESPONSE DYNAMICALLY:
 Do NOT follow a rigid template. Instead, read the user's query and create a beautifully structured, highly readable response using custom headings (##) that make sense for that specific topic. 
@@ -56,7 +56,7 @@ LANGUAGE:
 - ALWAYS reply in the exact same language that the user typed their prompt in. If they ask in Spanish, reply in Spanish. If in French, reply in French.
 
 IDENTITY (CRITICAL):
-- If the user asks who created you, what you are, or your origin, state clearly and concisely that you are Xynth Research, an AI assistant developed by **Tetrific Inc.** Do not hallucinate or create fictional architectures, weights, or complex origin stories. Keep it simple and truthful.
+- If the user asks who created you, what you are, or your origin, state clearly and concisely that you are Resynth Research, an AI assistant developed by **Resynth Inc.** Do not hallucinate or create fictional architectures, weights, or complex origin stories. Keep it simple and truthful.
 
 Be academically rigorous, precise, and highly readable."""
 
@@ -74,7 +74,7 @@ Reply with ONLY one word: RESEARCH or OFFTOPIC
 Query: """
 
 OFF_TOPIC_RESPONSES = [
-    "I'm Xynth Research — built for deep research and learning. Try asking me something like *\"What are the effects of climate change on agriculture?\"* or *\"Explain quantum entanglement\"*.",
+    "I'm Resynth Research — built for deep research and learning. Try asking me something like *\"What are the effects of climate change on agriculture?\"* or *\"Explain quantum entanglement\"*.",
     "That's a bit outside my research scope! I'm specialized for academic and factual research. Ask me about any topic — science, history, technology, current events — and I'll find you real sources.",
     "I'm a research assistant, so I'm best at finding and synthesizing information from the web. Try a research question and I'll pull from multiple sources for you! 📚",
 ]
@@ -363,13 +363,13 @@ def _ai_reject(query: str) -> str:
     """Use AI to craft a personalized, polite rejection referencing the specific query."""
     client, _, fast = _get_client()
     if not client:
-        return "I'm Xynth Research, focused on research and learning. Try asking me about science, technology, current events, or any topic you'd like to explore!"
+        return "I'm Resynth Research, focused on research and learning. Try asking me about science, technology, current events, or any topic you'd like to explore!"
     try:
         resp = client.chat.completions.create(
             model=fast,
             messages=[
                 {"role": "system", "content": (
-                    "You are Xynth Research, a focused AI research assistant for students and professionals. "
+                    "You are Resynth Research, a focused AI research assistant for students and professionals. "
                     "The user asked something that isn't a research or learning topic. "
                     "Write a SHORT, friendly, personalized reply (2-3 sentences max) that: "
                     "1) Acknowledges what they specifically asked, "
@@ -387,7 +387,7 @@ def _ai_reject(query: str) -> str:
         return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
 
 
-def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=None, deep_dive=False):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -401,6 +401,45 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
         yield f"data: {json.dumps({'type': 'status', 'text': '🤔 Thinking...'})}\n\n"
         msg = _ai_reject(query)
         yield f"data: {json.dumps({'type': 'token', 'text': msg})}\n\n"
+        
+        # Save to Supabase even if off-topic
+        if jwt_token and user_id:
+            import requests
+            headers = {
+                "apikey": os.environ.get("SUPABASE_KEY"),
+                "Authorization": f"Bearer {jwt_token}",
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            }
+            if not headers["Authorization"]:
+                # If we couldn't extract the token from auth_sb, we can't reliably insert bypassing RLS.
+                pass
+                
+            if headers["Authorization"] and not chat_id:
+                try:
+                    title = query[:40] + ("..." if len(query) > 40 else "")
+                    url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/chats"
+                    r = requests.post(url, headers=headers, json={"user_id": user_id, "title": title})
+                    if r.status_code in (200, 201) and r.json():
+                        chat_id = r.json()[0]["id"]
+                        yield f"data: {json.dumps({'type': 'chat_id', 'id': chat_id})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'error', 'text': f'Failed to insert chat REST: {r.text}'})}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'error', 'text': f'Create chat error: {str(e)}'})}\n\n"
+            
+            if headers["Authorization"] and chat_id:
+                try:
+                    url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/messages"
+                    r2 = requests.post(url, headers=headers, json=[
+                        {"chat_id": chat_id, "role": "user", "content": query},
+                        {"chat_id": chat_id, "role": "assistant", "content": msg},
+                    ])
+                    if r2.status_code not in (200, 201):
+                        yield f"data: {json.dumps({'type': 'error', 'text': f'Failed to insert msgs REST: {r2.text}'})}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'error', 'text': f'Save message error: {str(e)}'})}\n\n"
+
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
 
@@ -477,26 +516,40 @@ def stream_research(session_id: str, query: str, sb=None, user_id=None, chat_id=
         _conversations[session_id] = entry[-20:]
 
     # Save to Supabase chat if logged in
-    if sb and user_id:
-        if not chat_id:
+    if jwt_token and user_id:
+        import requests
+        headers = {
+            "apikey": os.environ.get("SUPABASE_KEY"),
+            "Authorization": f"Bearer {jwt_token}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        
+        if headers["Authorization"] and not chat_id:
             try:
                 title = query[:40] + ("..." if len(query) > 40 else "")
-                res = sb.table("chats").insert({"user_id": user_id, "title": title}).execute()
-                if res.data:
-                    chat_id = res.data[0]["id"]
+                url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/chats"
+                r = requests.post(url, headers=headers, json={"user_id": user_id, "title": title})
+                if r.status_code in (200, 201) and r.json():
+                    chat_id = r.json()[0]["id"]
                     # Notify frontend of new chat ID so it reloads the history dropdown
                     yield f"data: {json.dumps({'type': 'chat_id', 'id': chat_id})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'text': f'Failed to insert chat REST: {r.text}'})}\n\n"
             except Exception as e:
-                print("Create chat error:", e)
+                yield f"data: {json.dumps({'type': 'error', 'text': f'Create chat error: {str(e)}'})}\n\n"
 
-        if chat_id:
+        if headers["Authorization"] and chat_id:
             try:
-                sb.table("messages").insert([
+                url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/messages"
+                r2 = requests.post(url, headers=headers, json=[
                     {"chat_id": chat_id, "role": "user", "content": query},
                     {"chat_id": chat_id, "role": "assistant", "content": full_response},
-                ]).execute()
+                ])
+                if r2.status_code not in (200, 201):
+                    yield f"data: {json.dumps({'type': 'error', 'text': f'Failed to insert msgs REST: {r2.text}'})}\n\n"
             except Exception as e:
-                print("Save error:", e)
+                yield f"data: {json.dumps({'type': 'error', 'text': f'Save error: {str(e)}'})}\n\n"
 
     # ── Step 5: Image search (if requested or visual topic) ──────────────────
     if _wants_images(query):

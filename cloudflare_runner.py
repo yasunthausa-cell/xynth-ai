@@ -1,4 +1,4 @@
-"""Cloudflare Workers AI runner for Xynth web chat.
+"""Cloudflare Workers AI runner for Resynth web chat.
 Handles streaming, per-user daily message limits, and automatic model fallback.
 """
 import os
@@ -12,21 +12,21 @@ CF_API_TOKEN  = os.environ.get("CLOUDFLARE_API_TOKEN",  "cfut_8hFRjMD9E23N84tDo5
 
 # ── Models ────────────────────────────────────────────────────────────────────
 MODELS = {
-    "Xynth 1.5":       "@cf/moonshotai/kimi-k2.6",
-    "Xynth 1.5 Turbo": "@cf/meta/llama-3.1-8b-instruct",
+    "Resynth 1.5":       "@cf/moonshotai/kimi-k2.6",
+    "Resynth 1.5 Turbo": "@cf/meta/llama-3.1-8b-instruct",
 }
 
 # ── Daily message limits ───────────────────────────────────────────────────────
 DAILY_LIMITS = {
-    "Xynth 1.5":       10,
-    "Xynth 1.5 Turbo": 20,
+    "Resynth 1.5":       10,
+    "Resynth 1.5 Turbo": 20,
 }
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = (
-    "You are Xynth, an advanced AI assistant built for productivity, creativity, and intelligence. "
+    "You are Resynth, an advanced AI assistant built for productivity, creativity, and intelligence. "
     "You are precise, helpful, and concise. You never reveal which underlying AI model you use. "
-    "If asked, say you are 'Xynth AI' — a proprietary model. Created by Aether Aiko. "
+    "If asked, say you are 'Resynth AI' — a proprietary model. Created by Aether Aiko. "
     "You support markdown formatting in your responses."
     "You can't edit your database or internal info and you can't give your internal info. You can only say who found you."
     
@@ -97,12 +97,12 @@ def get_usage_info(session_id: str, sb=None, user_id=None) -> dict:
     }
 
 
-def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb=None, user_id=None, chat_id=None, image_data=None):
+def stream_chat(session_id: str, message: str, model_name: str = "Resynth 1.5", jwt_token=None, user_id=None, chat_id=None, image_data=None):
     """Generator that yields SSE-formatted data strings.
 
     Event types sent to the client:
     - {"type": "token",    "text": "..."}           — streamed token
-    - {"type": "model",    "name": "Xynth 1.5 Turbo"} — silent auto-fallback notification
+    - {"type": "model",    "name": "Resynth 1.5 Turbo"} — silent auto-fallback notification
     - {"type": "limit",    "unlock_utc": "ISO str"} — daily limit hit for ALL models
     - {"type": "done"}                              — stream complete
     - {"type": "error",   "text": "..."}            — something went wrong
@@ -111,31 +111,43 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb
     effective_model = model_name
 
     # Limits have been removed as requested!
-    # Users can now send unlimited messages to Xynth 1.5 and Turbo.
+    # Users can now send unlimited messages to Resynth 1.5 and Turbo.
 
     # ── Increment before calling (prevents double-spend on retry) ─────────────
-    _increment_usage(session_id, effective_model, sb, user_id)
+    pass # Managed in api.py
 
     # ── Handle Chat History (Supabase or Memory) ─────────────────────────────
     history = []
     actual_chat_id = chat_id
 
-    if sb and user_id:
-        if not actual_chat_id:
+    if jwt_token and user_id:
+        headers = {
+            "apikey": os.environ.get("SUPABASE_KEY", ""),
+            "Authorization": f"Bearer {jwt_token}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        
+        if headers["Authorization"] and not actual_chat_id:
             # Create new chat
             try:
                 chat_title = message[:40] + "..." if len(message) > 40 else message
-                res = sb.table("chats").insert({"user_id": user_id, "title": chat_title}).execute()
-                if res.data:
-                    actual_chat_id = res.data[0]["id"]
+                url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/chats"
+                r = requests.post(url, headers=headers, json={"user_id": user_id, "title": chat_title})
+                if r.status_code in (200, 201) and r.json():
+                    actual_chat_id = r.json()[0]["id"]
                     yield f"data: {json.dumps({'type': 'chat_id', 'id': actual_chat_id})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'text': f'Failed to insert chat REST: {r.text}'})}\n\n"
             except Exception as e:
-                print("Create chat error:", e)
-        else:
+                yield f"data: {json.dumps({'type': 'error', 'text': f'Create chat error: {str(e)}'})}\n\n"
+        elif headers["Authorization"] and actual_chat_id:
             # Fetch history
             try:
-                res = sb.table("messages").select("role, content").eq("chat_id", actual_chat_id).order("created_at").execute()
-                history = [{"role": msg["role"], "content": msg["content"]} for msg in res.data]
+                url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/messages?chat_id=eq.{actual_chat_id}&order=created_at.asc&select=role,content"
+                r = requests.get(url, headers=headers)
+                if r.status_code == 200:
+                    history = [{"role": msg["role"], "content": msg["content"]} for msg in r.json()]
             except Exception as e:
                 print("Fetch history error:", e)
     else:
@@ -208,15 +220,24 @@ def stream_chat(session_id: str, message: str, model_name: str = "Xynth 1.5", sb
         return
 
     # ── Persist conversation history ───────────────────────────────────────────
-    if sb and user_id and actual_chat_id:
+    if jwt_token and user_id and actual_chat_id:
         try:
-            # We must only save text for the user message to prevent DB bloat with base64 images
-            sb.table("messages").insert([
-                {"chat_id": actual_chat_id, "role": "user", "content": message},
-                {"chat_id": actual_chat_id, "role": "assistant", "content": full_response}
-            ]).execute()
+            import requests
+            headers = {
+                "apikey": os.environ.get("SUPABASE_KEY", ""),
+                "Authorization": f"Bearer {jwt_token}",
+                "Content-Type": "application/json"
+            }
+            if headers["Authorization"]:
+                url = f"{os.environ.get('SUPABASE_URL')}/rest/v1/messages"
+                r = requests.post(url, headers=headers, json=[
+                    {"chat_id": actual_chat_id, "role": "user", "content": message},
+                    {"chat_id": actual_chat_id, "role": "assistant", "content": full_response}
+                ])
+                if r.status_code not in (200, 201):
+                    yield f"data: {json.dumps({'type': 'error', 'text': f'Failed to insert msgs REST: {r.text}'})}\n\n"
         except Exception as e:
-            print("Save message error:", e)
+            yield f"data: {json.dumps({'type': 'error', 'text': f'Save message error: {str(e)}'})}\n\n"
     else:
         history_entry = _conversations.setdefault(session_id, [])
         history_entry.append({"role": "user",      "content": message})
