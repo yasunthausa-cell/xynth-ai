@@ -423,7 +423,10 @@ def chat_stream():
                 session_id=session_id, query=message,
                 jwt_token=current_token, user_id=user_id, chat_id=chat_id,
                 deep_dive=deep_dive, sb=_sb, session_doc=session_doc,
-                lit_review=lit_review, image_data=image_data
+                lit_review=lit_review, image_data=image_data,
+                citation_style=data.get('citation_style', 'inline'),
+                strategy=data.get('strategy', 'balanced'),
+                debate=data.get('debate', False)
             )
 
         headers = {

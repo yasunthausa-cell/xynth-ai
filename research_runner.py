@@ -88,6 +88,25 @@ OFF_TOPIC_RESPONSES = [
 import random
 import re as _re
 
+FACT_CHECK_PROMPT = """You are a meticulous Research Auditor. 
+Your task is to review the following research report against the provided raw source data.
+
+CHECK FOR:
+1. HALLUCINATIONS: Are there any claims in the report that are NOT supported by the sources?
+2. MISCITATIONS: Does the text cite Source A but the information actually came from Source B (or nowhere)?
+3. CONTRADICTIONS: Are there areas where the sources disagree, but the report ignored the conflict?
+
+Return a JSON object with:
+{
+  "status": "VERIFIED" or "CLARIFIED",
+  "notes": "A brief summary of your verification (e.g., 'All 12 claims verified' or 'Found minor contradiction regarding X').",
+  "corrections": "Any specific sentences that should be updated."
+}
+
+Report to Audit: {report}
+Sources: {sources}
+"""
+
 _conversations: dict = {}
 
 # ── URL fetching ────────────────────────────────────────────────────────────────
@@ -529,7 +548,7 @@ def _ai_simple_reply(query: str, mode: str) -> str:
     except: return "I'm here to help with your research. What would you like to explore?"
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, image_data=None):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, image_data=None, **kwargs):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -679,7 +698,11 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         doc_msg = '📎 Analyzing your attached paper...'
         yield f'data: {json.dumps({"type": "status", "id": "doc", "text": doc_msg})}\n\n'
 
-    # Step 4: Build prompt and stream report
+    # Step 4: Synthesis ──────────────────────────────────────────────────
+    citation_style = kwargs.get('citation_style', 'inline')
+    strategy = kwargs.get('strategy', 'balanced')
+    is_debate = kwargs.get('debate', False)
+
     source_text = _format_sources(results)
     augmented = (
         (f"[WEB SEARCH RESULTS — {datetime.date.today()}]\n{source_text}\n\n" if source_text.strip() else "")
@@ -690,11 +713,30 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     )
 
     synth_msg = '🧠 Synthesizing comprehensive research report...' if not lit_review else '📚 Synthesizing formal literature review...'
-    yield f'data: {json.dumps({"type": "status", "id": "synth", "text": synth_msg})}\n\n'
+    if is_debate: synth_msg = '⚔️ Engaging Multi-Agent Debate Mode...'
+    yield f"data: {json.dumps({'type': 'status', 'id': 'synth', 'text': synth_msg})}\n\n"
 
     base_prompt = LIT_REVIEW_PROMPT if lit_review else RESEARCH_SYSTEM_PROMPT
+    
+    style_instr = f"\n\nCITATION STYLE: Use {citation_style.upper()} format for all citations." if citation_style != 'inline' else ""
     verbosity_instruction = "\n\nBE EXTREMELY CONCISE: Provide a direct answer in 1-3 paragraphs. No fluff." if not deep_dive and not lit_review else "\n\nDEEP DIVE MODE: Provide an exhaustive, detailed, and comprehensive scholarly report."
-    dynamic_system_prompt = base_prompt + verbosity_instruction + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year}."
+    
+    dynamic_system_prompt = base_prompt + verbosity_instruction + style_instr + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}."
+
+    if is_debate:
+        # DEBATE LOGIC: Run two perspectives
+        perspectives = ["PRO/SUPPORTIVE Perspective", "CON/CRITICAL Perspective"]
+        for p in perspectives:
+            yield f"data: {json.dumps({'type': 'token', 'text': f'\\n\\n### {p}\\n'})}\n\n"
+            p_prompt = dynamic_system_prompt + f"\n\nYou are representing the {p}. Focus on arguments and evidence supporting this specific side."
+            messages = [{"role": "system", "content": p_prompt}, {"role": "user", "content": augmented}]
+            
+            stream = client.chat.completions.create(model=primary_model, messages=messages, max_tokens=2000, stream=True)
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield f"data: {json.dumps({'type': 'token', 'text': chunk.choices[0].delta.content})}\n\n"
+        return
+
     messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
     messages.append({"role": "user", "content": augmented})
@@ -718,6 +760,21 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     except Exception as exc:
         yield f"data: {json.dumps({'type': 'error', 'text': repr(exc)})}\n\n"
         return
+
+    # ── Step 4: Fact-Check & Verification ───────────────────────────────────
+    if results and len(full_response) > 200:
+        yield f'data: {json.dumps({"type": "status", "id": "verify", "text": "🛡️ Cross-verifying claims with source data..."})}\n\n'
+        try:
+            audit_prompt = FACT_CHECK_PROMPT.format(report=full_response[:4000], sources=source_text[:6000])
+            audit_resp = client.chat.completions.create(
+                model=FAST_MODEL,
+                messages=[{"role": "user", "content": audit_prompt}],
+                response_format={"type": "json_object"},
+                max_tokens=300
+            )
+            audit_data = json.loads(audit_resp.choices[0].message.content)
+            yield f"data: {json.dumps({'type': 'verification', 'data': audit_data})}\n\n"
+        except: pass
 
     # Persist history (store plain query, not augmented)
     entry = _conversations.setdefault(session_id, [])
