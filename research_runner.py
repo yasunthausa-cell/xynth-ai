@@ -80,8 +80,63 @@ OFF_TOPIC_RESPONSES = [
 ]
 
 import random
+import re as _re
 
 _conversations: dict = {}
+
+# ── URL fetching ────────────────────────────────────────────────────────────────
+URL_PATTERN = _re.compile(r'https?://[^\s<>"]+', _re.IGNORECASE)
+
+def _fetch_url_content(url: str, max_chars: int = 8000) -> str:
+    """Fetch and extract readable text from a URL. Handles arxiv & pubmed specially."""
+    import requests
+    from bs4 import BeautifulSoup
+
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; ResynthBot/1.0)"}
+
+    # Arxiv: convert /abs/ links to /pdf/ or use the API
+    if "arxiv.org/abs/" in url:
+        arxiv_id = url.split("/abs/")[-1].split("?")[0].strip()
+        try:
+            api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}&max_results=1"
+            r = requests.get(api_url, timeout=10, headers=headers)
+            soup = BeautifulSoup(r.text, "xml")
+            entry = soup.find("entry")
+            if entry:
+                title   = entry.find("title").text.strip() if entry.find("title") else ""
+                summary = entry.find("summary").text.strip() if entry.find("summary") else ""
+                authors = ", ".join(a.find("name").text for a in entry.find_all("author") if a.find("name"))
+                return f"**Paper:** {title}\n**Authors:** {authors}\n\n**Abstract:**\n{summary}"
+        except Exception as e:
+            print(f"[URL] ArXiv API failed: {e}")
+
+    # PubMed: extract PMID and use eutils
+    pubmed_match = _re.search(r'pubmed\.ncbi\.nlm\.nih\.gov/(\d+)', url)
+    if pubmed_match:
+        pmid = pubmed_match.group(1)
+        try:
+            efetch = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=text&rettype=abstract"
+            r = requests.get(efetch, timeout=10, headers=headers)
+            if r.status_code == 200:
+                return r.text.strip()[:max_chars]
+        except Exception as e:
+            print(f"[URL] PubMed fetch failed: {e}")
+
+    # Generic URL — fetch and parse HTML
+    try:
+        r = requests.get(url, timeout=12, headers=headers)
+        soup = BeautifulSoup(r.text, "html.parser")
+        # Remove boilerplate
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+            tag.decompose()
+        # Try main content areas first
+        for selector in ["article", "main", ".content", "#content", ".post", ".entry-content"]:
+            el = soup.select_one(selector)
+            if el:
+                return el.get_text(separator="\n", strip=True)[:max_chars]
+        return soup.get_text(separator="\n", strip=True)[:max_chars]
+    except Exception as e:
+        return f"[Could not fetch URL: {e}]"
 
 
 def _get_client():
@@ -186,7 +241,48 @@ def _needs_search(query: str, history: list = None) -> bool:
 
 
 def _search_one(query: str) -> list[dict]:
-    """Search with multiple fallback strategies — never silently fails."""
+    """Perform a single web search with fallback strategies."""
+    query_lower = query.lower()
+    is_academic = any(w in query_lower for w in ["arxiv", "paper", "pubmed", "scholar", "study", "journal", "research"])
+    
+    if is_academic:
+        # 1a. Try Google Scholar via scholarly
+        try:
+            from scholarly import scholarly as _scholarly
+            results = []
+            for pub in _scholarly.search_pubs(query):
+                title = pub.get("bib", {}).get("title", "")
+                abstract = pub.get("bib", {}).get("abstract", "")
+                pub_url = pub.get("pub_url", "")
+                if title and abstract:
+                    results.append({"title": title, "url": pub_url, "body": abstract})
+                if len(results) >= 3:
+                    break
+            if results:
+                return results
+        except Exception as e_scholar:
+            print(f"[Search] Google Scholar failed: {e_scholar}")
+
+        # 1b. ArXiv / PubMed
+        try:
+            from langchain_community.utilities import ArxivAPIWrapper, PubMedAPIWrapper
+            results = []
+            if "pubmed" in query_lower or "medical" in query_lower or "health" in query_lower or "biology" in query_lower:
+                pubmed = PubMedAPIWrapper(top_k_results=3)
+                res = pubmed.run(query)
+                if res and "No good PubMed Result" not in res:
+                    results.append({"title": f"PubMed Results for '{query}'", "url": "https://pubmed.ncbi.nlm.nih.gov/", "body": res})
+            
+            if not results or any(w in query_lower for w in ["arxiv", "physics", "math", "computer science", "paper"]):
+                arxiv = ArxivAPIWrapper(top_k_results=3, doc_content_chars_max=2000)
+                res = arxiv.run(query)
+                if res and "No good Arxiv Result" not in res:
+                    results.append({"title": f"ArXiv Results for '{query}'", "url": "https://arxiv.org/", "body": res})
+            
+            if results:
+                return results
+        except Exception as e_acad:
+            print(f"[Search] Academic APIs failed: {e_acad}")
 
     # Strategy 1: Direct DuckDuckGo HTML Scraper (bulletproof, no API rate limits)
     try:
@@ -387,7 +483,7 @@ def _ai_reject(query: str) -> str:
         return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -395,6 +491,16 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         return
 
     history = _conversations.get(session_id, [])
+
+    # ── Detect and fetch URLs embedded in the query ───────────────────────────────
+    urls_in_query = URL_PATTERN.findall(query)
+    fetched_url_context = ""
+    if urls_in_query:
+        yield f"data: {json.dumps({'type': 'status', 'text': f'\ud83d\udd17 Fetching {len(urls_in_query)} linked source(s)...'})}\n\n"
+        for u in urls_in_query[:3]:  # cap at 3 URLs
+            content = _fetch_url_content(u)
+            if content and not content.startswith("[Could not"):
+                fetched_url_context += f"\n\n[FETCHED URL: {u}]\n{content}"
 
     # ── Guard: reject off-topic — AI crafts personalized reply ───────────────
     if not _is_research_query(query, history):
@@ -471,16 +577,24 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
             from rag_pipeline import retrieve_relevant_chunks
             chunks = retrieve_relevant_chunks(query, user_id, sb)
             if chunks:
-                rag_context = "\n\n[USER DOCUMENTS]\n" + "\n---\n".join(chunks)
+                rag_context = "\n\n[USER DOCUMENTS — RAG]\n" + "\n---\n".join(chunks)
                 yield f"data: {json.dumps({'type': 'status', 'text': '📁 Found relevant content in your documents...'})}\n\n"
         except Exception as e:
             print("RAG retrieve error:", e)
 
+    # Session document (uploaded this session — kept for follow-ups)
+    session_doc_context = ""
+    if session_doc:
+        session_doc_context = f"\n\n[ATTACHED DOCUMENT — USER UPLOADED THIS SESSION]\n{session_doc[:12000]}"
+        yield f"data: {json.dumps({'type': 'status', 'text': '📎 Reading your attached document...'})}\n\n"
+
     # Step 4: Build prompt and stream report
     source_text = _format_sources(results)
     augmented = (
-        f"[WEB SEARCH RESULTS — {datetime.date.today()}]\n{source_text}"
+        (f"[WEB SEARCH RESULTS — {datetime.date.today()}]\n{source_text}\n\n" if source_text.strip() else "")
+        + fetched_url_context
         + rag_context
+        + session_doc_context
         + f"\n\nResearch query: {query}"
     )
 
@@ -506,7 +620,7 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'text': token})}\n\n"
     except Exception as exc:
-        yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+        yield f"data: {json.dumps({'type': 'error', 'text': repr(exc)})}\n\n"
         return
 
     # Persist history (store plain query, not augmented)

@@ -329,6 +329,21 @@ def chat():
     return jsonify({"response": _run_agent(session_id, augmented)})
 
 
+# ── In-memory session document store ─────────────────────────────────────────
+# Keeps the last uploaded document text per session so follow-up
+# questions work without re-uploading the file.
+_session_docs: dict = {}
+
+
+@app.route("/session/clear-doc", methods=["POST"])
+def clear_session_doc():
+    """Clear the stored document for a session."""
+    data = request.get_json(silent=True) or {}
+    sid = str(data.get("session_id", ""))
+    _session_docs.pop(sid, None)
+    return jsonify({"ok": True})
+
+
 @app.route("/chat/stream", methods=["GET", "POST"])
 def chat_stream():
     """Server-Sent Events stream. Supports both GET (legacy) and POST (new CF runner)."""
@@ -343,10 +358,31 @@ def chat_stream():
 
         deep_dive  = bool(data.get("deep_dive", False))
 
+        # Handle document attachments (PDF/TXT/DOCX) — extract text + store in session
+        if image_data and image_data.startswith("data:"):
+            mime_type = image_data.split(";")[0].split(":")[1]
+            DOC_MIMES = [
+                "application/pdf",
+                "text/plain",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ]
+            if mime_type in DOC_MIMES:
+                import base64
+                from rag_pipeline import extract_text_from_pdf, extract_text_from_txt
+                try:
+                    file_bytes = base64.b64decode(image_data.split(",")[1])
+                    doc_text = extract_text_from_pdf(file_bytes) if mime_type == "application/pdf" else extract_text_from_txt(file_bytes)
+                    if doc_text and doc_text.strip():
+                        _session_docs[session_id] = doc_text.strip()
+                except Exception as e:
+                    print("Doc parse error:", e)
+                image_data = None  # Route to text engine
+
+        auth_header = request.headers.get("Authorization", "")
         user_id = None
         current_token = None
         if _SB_URL:
-            auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 current_token = auth_header.split(" ")[1]
                 user_id = _get_user_id(current_token)
@@ -385,11 +421,13 @@ def chat_stream():
                     chat_id=chat_id, image_data=image_data
                 )
             else:
+                # Retrieve any stored session document to include as context
+                session_doc = _session_docs.get(session_id)
                 # All text queries → research engine
                 yield from _research.stream_research(
                     session_id=session_id, query=message,
                     jwt_token=current_token, user_id=user_id, chat_id=chat_id,
-                    deep_dive=deep_dive
+                    deep_dive=deep_dive, sb=_sb, session_doc=session_doc
                 )
 
         headers = {
