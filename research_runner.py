@@ -727,7 +727,8 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         # DEBATE LOGIC: Run two perspectives
         perspectives = ["PRO/SUPPORTIVE Perspective", "CON/CRITICAL Perspective"]
         for p in perspectives:
-            yield f"data: {json.dumps({'type': 'token', 'text': f'\\n\\n### {p}\\n'})}\n\n"
+            debate_header = f"\n\n### {p}\n"
+            yield f"data: {json.dumps({'type': 'token', 'text': debate_header})}\n\n"
             p_prompt = dynamic_system_prompt + f"\n\nYou are representing the {p}. Focus on arguments and evidence supporting this specific side."
             messages = [{"role": "system", "content": p_prompt}, {"role": "user", "content": augmented}]
             
