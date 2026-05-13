@@ -35,30 +35,20 @@ PRIMARY_MODEL = "qwen3.5-omni-plus"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
 FAST_MODEL    = "qwen3-omni-flash"
 
-RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant for students and professionals.
+RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant.
 
 STRUCTURE YOUR RESPONSE DYNAMICALLY:
-Do NOT follow a rigid template. Instead, read the user's query and create a beautifully structured, highly readable response using custom headings (##) that make sense for that specific topic. 
-- Use bold text, bullet points, and paragraphs to make it scannable.
-- DO NOT use markdown tables unless explicitly asked. Tables are hard to read on mobile. Use bullet points instead.
-- If it's a coding question, provide clear explanations and code blocks.
-- If it's news, structure it chronologically or by theme.
-- Add relevant emojis to your headings to make it engaging.
+- Read the user's query and adapt your length. Simple questions = short answers.
+- Use headings (##) and emojis for complex topics.
+- ALWAYS cite sources INLINE: [Source Name](URL).
+- DO NOT use generic numbers like [1].
 
-CITING SOURCES (CRITICAL):
-- If you were provided web search results, ALWAYS use them and cite them.
-- Cite your sources INLINE using markdown hyperlinks with the source's name. 
-  Example: "According to [Reuters](https://...), the market..." or "...grew by 50% ([Bloomberg](https://...))."
-- DO NOT use generic numbers like [1] or [2] for citations. Use the actual name/title of the source as the clickable link text.
-- NEVER output a "References", "Sources", or "Citations" list at the end of your response. The UI will automatically generate a hidden dropdown for this.
+CONCISENESS:
+- Unless 'Deep Dive' is active, be concise (2-4 paragraphs max).
+- If it's a greeting or simple fact, be very brief.
 
-LANGUAGE:
-- ALWAYS reply in the exact same language that the user typed their prompt in. If they ask in Spanish, reply in Spanish. If in French, reply in French.
-
-IDENTITY (CRITICAL):
-- If the user asks who created you, what you are, or your origin, state clearly and concisely that you are Resynth Research, an AI assistant developed by **Resynth Inc.** Do not hallucinate or create fictional architectures, weights, or complex origin stories. Keep it simple and truthful.
-
-Be academically rigorous, precise, and highly readable."""
+IDENTITY:
+- You are Resynth Research by Resynth Inc. Reply in the user's language. Do not repeat introductions."""
 
 LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
 Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
@@ -78,12 +68,13 @@ If the user's query contains typos, misspellings, or bad grammar, automatically 
 Return ONLY a JSON array of 3 strings. Example: ["sub-query 1", "sub-query 2", "sub-query 3"]
 Query: """
 
-CLASSIFY_PROMPT = """You are a research tool classifier. Decide if this query is a legitimate research/learning/coding topic.
+CLASSIFY_PROMPT = """You are a research tool classifier. Decide how to handle this query.
 
-ALLOWED: Science, history, technology, medicine, law, economics, society, news, coding, programming, math, engineering, academic subjects, how-to learn something, current events, analysis of any topic, debugging help, code explanation.
-NOT ALLOWED: Personal chit-chat ("how are you", "tell me a joke"), purely creative requests with no educational value ("write me a love poem"), or requests that are harmful.
+RESEARCH: Complex topics, academic subjects, coding, news, or any topic requiring a multi-source synthesis.
+GREETING: "hi", "hello", "good morning", "how are you".
+GENERAL: Simple facts, quick definitions, math, or direct questions that can be answered in 1-2 sentences without web research.
 
-Reply with ONLY one word: RESEARCH or OFFTOPIC
+Reply with ONLY one word: RESEARCH, GREETING, or GENERAL.
 Query: """
 
 OFF_TOPIC_RESPONSES = [
@@ -502,32 +493,38 @@ def _format_sources(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _ai_reject(query: str) -> str:
-    """Use AI to craft a personalized, polite rejection referencing the specific query."""
+def _is_research_query(query: str, history: list) -> str:
+    """Classify the user's intent."""
     client, _, fast = _get_client()
-    if not client:
-        return "I'm Resynth Research, focused on research and learning. Try asking me about science, technology, current events, or any topic you'd like to explore!"
+    if not client: return "RESEARCH"
     try:
         resp = client.chat.completions.create(
             model=fast,
-            messages=[
-                {"role": "system", "content": (
-                    "You are Resynth Research, a focused AI research assistant for students and professionals. "
-                    "The user asked something that isn't a research or learning topic. "
-                    "Write a SHORT, friendly, personalized reply (2-3 sentences max) that: "
-                    "1) Acknowledges what they specifically asked, "
-                    "2) Explains you're focused on research/learning topics, "
-                    "3) Suggests they try a research question instead. "
-                    "Be warm but clear. Don't be robotic."
-                )},
-                {"role": "user", "content": query}
-            ],
-            max_tokens=120,
-            temperature=0.8,
+            messages=[{"role": "user", "content": CLASSIFY_PROMPT + query}],
+            max_tokens=10
+        )
+        return resp.choices[0].message.content.strip().upper()
+    except: return "RESEARCH"
+
+def _ai_simple_reply(query: str, mode: str) -> str:
+    """Fast, concise reply for greetings or simple facts."""
+    client, _, fast = _get_client()
+    if not client: return "Hello! How can I help with your research today?"
+    
+    system = "You are Resynth Research. Be extremely concise."
+    if mode == "GREETING":
+        system += " Respond with a warm, short greeting and ask how you can help with research."
+    else:
+        system += " Provide a direct, factual answer in 1-2 sentences. No fluff."
+        
+    try:
+        resp = client.chat.completions.create(
+            model=fast,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": query}],
+            max_tokens=150
         )
         return resp.choices[0].message.content.strip()
-    except Exception:
-        return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
+    except: return "I'm here to help with your research. What would you like to explore?"
 
 
 def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False):
@@ -558,12 +555,16 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
             if content and not content.startswith("[Could not"):
                 fetched_url_context += f"\n\n[FETCHED SOURCE: {u}]\n{content}"
 
-    # ── Guard: reject off-topic — AI crafts personalized reply ───────────────
-    if not _is_research_query(query, history):
-        think_msg = '🤔 Thinking...'
-        yield f'data: {json.dumps({"type": "status", "text": think_msg})}\n\n'
-        msg = _ai_reject(query)
+    # ── Guard: Intent Detection ──────────────────────────────────────────────
+    intent = _is_research_query(query, history)
+    if intent in ("GREETING", "GENERAL"):
+        msg = _ai_simple_reply(query, intent)
+        # Avoid repetition
+        if history and history[-1]['content'].strip() == msg.strip():
+            msg = "How else can I assist your research today?"
+            
         yield f"data: {json.dumps({'type': 'token', 'text': msg})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
         
         # Save to Supabase even if off-topic
         if jwt_token and user_id:
@@ -669,7 +670,8 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     yield f'data: {json.dumps({"type": "status", "id": "synth", "text": synth_msg})}\n\n'
 
     base_prompt = LIT_REVIEW_PROMPT if lit_review else RESEARCH_SYSTEM_PROMPT
-    dynamic_system_prompt = base_prompt + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
+    verbosity_instruction = "\n\nBE EXTREMELY CONCISE: Provide a direct answer in 1-3 paragraphs. No fluff." if not deep_dive and not lit_review else "\n\nDEEP DIVE MODE: Provide an exhaustive, detailed, and comprehensive scholarly report."
+    dynamic_system_prompt = base_prompt + verbosity_instruction + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year}."
     messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
     messages.append({"role": "user", "content": augmented})
@@ -737,6 +739,29 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
                 yield f"data: {json.dumps({'type': 'error', 'text': f'Save error: {str(e)}'})}\n\n"
 
     # ── Step 5: Image search (if requested or visual topic) ──────────────────
+    # ── Step 5: Summary & BibTeX ─────────────────────────────────────────────
+    bibtex_data = ""
+    if results:
+        bibtex_parts = []
+        for i, res in enumerate(results[:10]):
+            safe_title = re.sub(r'[^a-zA-Z0-9]', '', res.get('title', 'paper')[:20])
+            bib = f"@article{{resynth_{i}_{safe_title},\n  title={{{res.get('title', 'Unknown Title')}}},\n  author={{Resynth Research Assistant}},\n  url={{{res.get('url', '')}}},\n  journal={{Web Source}},\n  year={{{datetime.now().year}}}\n}}"
+            bibtex_parts.append(bib)
+        bibtex_data = "\n\n".join(bibtex_parts)
+        yield f"data: {json.dumps({'type': 'bibtex', 'bibtex': bibtex_data})}\n\n"
+
+    if is_deep_dive:
+        summary_prompt = f"Summarize the following research in exactly 3 bullet points as an 'Executive Summary':\n\n{full_response[:4000]}"
+        try:
+            sum_resp = client.chat.completions.create(
+                model=FAST_MODEL,
+                messages=[{"role": "user", "content": summary_prompt}],
+                max_tokens=200
+            )
+            summary_text = sum_resp.choices[0].message.content.strip()
+            yield f"data: {json.dumps({'type': 'summary', 'text': summary_text})}\n\n"
+        except: pass
+
     if _wants_images(query):
         img_status = '🖼️ Fetching relevant images...'
         yield f'data: {json.dumps({"type": "status", "text": img_status})}\n\n'

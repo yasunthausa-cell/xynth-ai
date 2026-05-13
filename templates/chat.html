@@ -451,38 +451,42 @@
         }
 
         .top-nav {
-            padding: 12px 16px;
+            padding: 14px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            position: sticky;
+            position: absolute;
             top: 0; left: 0; right: 0;
-            z-index: 100;
-            background: rgba(18, 18, 18, 0.8);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+            z-index: 1000;
+            background: transparent;
+            border-bottom: none;
+            pointer-events: none;
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
         .toggle-sidebar {
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.06);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255,255,255,0.12);
             color: var(--text-primary);
-            font-size: 18px;
+            font-size: 20px;
             cursor: pointer;
-            display: none; /* Hidden by default, shown in mobile media query */
+            display: none; 
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
-            padding: 8px 12px;
+            border-radius: 12px;
+            width: 44px;
+            height: 44px;
             line-height: 1;
             transition: all 0.2s;
+            pointer-events: auto;
         }
         .toggle-sidebar.sidebar-open {
             opacity: 0;
+            visibility: hidden;
             pointer-events: none;
         }
-        .toggle-sidebar:hover { background: rgba(255,255,255,0.15); }
+        .toggle-sidebar:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
 
         @media (max-width: 768px) {
             .toggle-sidebar { display: flex; }
@@ -529,22 +533,6 @@
             font-weight: 600;
         }
 
-        /* --- Cinematic Hero Landing --- */
-        #landingGreeting {
-            position: relative;
-        }
-        .hero-glow {
-            position: absolute;
-            width: 520px;
-            height: 260px;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -60%);
-            background: radial-gradient(ellipse at center, rgba(16,185,129,0.22) 0%, transparent 70%);
-            animation: heroPulseGlow 4s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 0;
-        }
         .hero-headline {
             font-size: clamp(28px, 5vw, 52px);
             font-weight: 800;
@@ -578,12 +566,13 @@
         /* --- Chat View --- */
         .chat-view {
             flex: 1;
-            overflow-y: auto;
+            overflow: hidden; /* Completely locked until messages exist */
             padding: 0 16px 20px;
             display: none;
             scroll-behavior: smooth;
         }
         .chat-view.active { display: block; }
+        .chat-view.has-messages { overflow-y: auto; }
         .messages-container {
             max-width: 800px;
             margin: 0 auto;
@@ -667,6 +656,29 @@
         .bubble h1, .bubble h2, .bubble h3 { margin-top: 24px; margin-bottom: 12px; font-weight: 600; }
         .bubble li { margin-bottom: 8px; line-height: 1.65; font-size: 15px; }
         .bubble a { color: #10b981; text-decoration: none; font-weight: 500; }
+        
+        .bubble table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 14px;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .bubble th, .bubble td {
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            text-align: left;
+            min-width: 120px;
+        }
+        .bubble th {
+            background: rgba(255,255,255,0.05);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
         .bubble a:hover { text-decoration: underline; }
         .bubble pre { position: relative; background: #0d1117; padding: 0; border-radius: 10px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--border); }
         .bubble pre .code-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: #161b22; border-bottom: 1px solid #30363d; font-size: 12px; color: #8b949e; font-family: monospace; }
@@ -1117,10 +1129,12 @@
             transition: all 0.2s;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             margin-top: 8px;
             font-weight: 500;
-            width: max-content;
+            min-width: 100px; /* Prevent UI shift */
+            height: 36px;
         }
         .deep-dive-btn.active {
             background: rgba(16, 185, 129, 0.2);
@@ -1132,6 +1146,7 @@
             border-color: #a78bfa !important;
             color: #a78bfa !important;
         }
+        .lit-review-btn { min-width: 100px; }
 
         /* --- Countdown --- */
         .countdown {
@@ -1451,6 +1466,18 @@
             <input type="text" id="chatSearchInput" placeholder="Search chats" style="width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text-primary); padding: 8px 12px 8px 30px; border-radius: 8px; font-size: 13px; box-sizing: border-box;">
         </div>
 
+        <!-- Projects Section -->
+        <div style="padding:0 12px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 4px;">
+                <span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Projects</span>
+                <button id="addProjectBtn" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:4px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    New
+                </button>
+            </div>
+            <div id="projectList" style="display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+
         <div class="chat-list-label">Recent</div>
         <div class="chat-list" id="chatList">
             <!-- Historical chats will go here -->
@@ -1499,37 +1526,11 @@
             Scroll to bottom
         </button>
 
-        <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column;">
-            <div class="spacer"></div>
-            <div id="landingGreeting" style="text-align:center; padding: 0 16px 24px; display: none;">
-                <div class="hero-glow"></div>
-                <h1 class="hero-headline">Research anything.<br><span class="grad">Instantly.</span></h1>
-                <p class="hero-sub">Ask Resynth to search the web, read papers from ArXiv &amp; PubMed, analyze documents, and synthesize comprehensive answers.</p>
+        <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column; height: 100%;">
+            <div id="landingGreeting" style="flex: 1; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; touch-action: none;">
+                <h1 class="hero-headline"><span id="greetingText">Good Morning.</span><br><span class="grad">How can I help today?</span></h1>
             </div>
-            <div id="suggestions" class="suggestions" style="display: none;">
-                <button class="suggestion-chip">
-                    <span class="chip-icon">⚛️</span>
-                    <span class="chip-title">Quantum &amp; Physics</span>
-                    <span class="chip-desc">How does quantum entanglement work?</span>
-                </button>
-                <button class="suggestion-chip">
-                    <span class="chip-icon">🧬</span>
-                    <span class="chip-title">Life Sciences</span>
-                    <span class="chip-desc">Latest CRISPR breakthroughs from PubMed</span>
-                </button>
-                <button class="suggestion-chip">
-                    <span class="chip-icon">🤖</span>
-                    <span class="chip-title">AI &amp; Technology</span>
-                    <span class="chip-desc">Best AI papers from ArXiv this week</span>
-                </button>
-                <button class="suggestion-chip">
-                    <span class="chip-icon">🌍</span>
-                    <span class="chip-title">Global Economics</span>
-                    <span class="chip-desc">What causes inflation and how to fight it?</span>
-                </button>
-                <button class="suggestion-chip">Explain CRISPR gene editing and its risks</button>
-            </div>
-            <div class="messages-container" id="messagesContainer"></div>
+            <div id="messagesContainer" class="messages-container"></div>
         </div>
 
         <div class="input-area">
@@ -1934,7 +1935,8 @@
             localStorage.setItem('xynth_session', sessionId);
             currentChatId = "";
             messagesContainer.innerHTML = '';
-            document.getElementById('suggestions').style.display = 'grid';
+            chatView.classList.remove('has-messages');
+            updateGreeting(); // Update greeting text
             document.getElementById('landingGreeting').style.display = 'block';
             
             // Hide nav on mobile for new chat
@@ -1945,12 +1947,23 @@
         });
 
         
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = "Good Evening";
+            if (hour < 12) greeting = "Good Morning";
+            else if (hour < 18) greeting = "Good Afternoon";
+            
+            const greetingEl = document.getElementById('greetingText');
+            if (greetingEl) greetingEl.textContent = greeting + ".";
+        }
+
         // Auto-show greeting if empty
         window.addEventListener('load', () => {
             setTimeout(() => {
                 if (messagesContainer.children.length === 0) {
-                    document.getElementById('suggestions').style.display = 'grid';
-                    document.getElementById('landingGreeting').style.display = 'block';
+                    updateGreeting();
+                    chatView.classList.remove('has-messages');
+                    document.getElementById('landingGreeting').style.display = 'flex';
                     if (window.innerWidth <= 768) {
                         document.getElementById('topNav').classList.add('hidden-mobile');
                     }
@@ -2018,6 +2031,34 @@
                 send();
             });
         });
+
+        // --- Project Logic ---
+        let projects = JSON.parse(localStorage.getItem('resynth_projects') || '[]');
+        function renderProjects() {
+            const list = document.getElementById('projectList');
+            if (!list) return;
+            list.innerHTML = '';
+            projects.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = 'nav-btn';
+                btn.style.cssText = 'padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:8px;';
+                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> ${p.name}`;
+                btn.onclick = () => {
+                    searchQuery = 'project:' + p.id;
+                    renderChatHistory();
+                };
+                list.appendChild(btn);
+            });
+        }
+        document.getElementById('addProjectBtn').addEventListener('click', () => {
+            const name = prompt("Enter project name:");
+            if (name) {
+                projects.push({ id: Date.now(), name: name });
+                localStorage.setItem('resynth_projects', JSON.stringify(projects));
+                renderProjects();
+            }
+        });
+        renderProjects();
 
         let allChats = [];
         let searchQuery = '';
@@ -2439,8 +2480,8 @@
             // Show guest warning on first message
             showGuestToast();
             
-            document.getElementById('suggestions').style.display = 'none';
             document.getElementById('landingGreeting').style.display = 'none';
+            chatView.classList.add('has-messages');
             
             // Show nav on mobile when conversation starts
             if (window.innerWidth <= 768) {
@@ -2599,6 +2640,13 @@
                                     showLimitModal(data.unlock_utc, modelSelector.value);
                                     if (modelSelector.value === 'Resynth 1.5') modelSelector.value = 'Resynth 1.5 Turbo';
                                     if (!fullText) botBubble.querySelector('.markdown-body').innerHTML = '<span style="color:#ef4444">Message blocked due to daily limit.</span>';
+                                } else if (data.type === 'summary') {
+                                    const sumBox = document.createElement('div');
+                                    sumBox.style.cssText = 'background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:14px;border-radius:12px;margin-bottom:20px;font-size:14px;';
+                                    sumBox.innerHTML = `<div style="font-weight:600;color:var(--accent);margin-bottom:8px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Executive Summary</div>${marked.parse(data.text)}`;
+                                    botBubble.querySelector('.markdown-body').prepend(sumBox);
+                                } else if (data.type === 'bibtex') {
+                                    botBubble.dataset.bibtex = data.bibtex;
                                 } else if (data.type === 'followups') {
                                     const wrap = document.createElement('div');
                                     wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;animation:fadeIn 0.5s both';
@@ -2616,7 +2664,26 @@
                                     botBubble.appendChild(wrap);
                                 } else if (data.type === 'error') {
                                     botBubble.querySelector('.markdown-body').innerHTML += `<br><span style="color:#ef4444">Error: ${data.text}</span>`;
-                                } else if (data.type === 'done' && botBubble.dataset.sources) {
+                                } else if (data.type === 'done') {
+                                    // BibTeX button
+                                    if (botBubble.dataset.bibtex) {
+                                        const actions = botBubble.querySelector('.message-actions');
+                                        const bibBtn = document.createElement('button');
+                                        bibBtn.className = 'action-btn';
+                                        bibBtn.title = 'Export BibTeX';
+                                        bibBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>';
+                                        bibBtn.onclick = () => {
+                                            const blob = new Blob([botBubble.dataset.bibtex], { type: 'text/plain' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = 'citations.bib';
+                                            a.click();
+                                        };
+                                        if (actions) actions.appendChild(bibBtn);
+                                    }
+                                    
+                                    if (botBubble.dataset.sources) {
                                     // Append collapsible sources section
                                     try {
                                         const sources = JSON.parse(botBubble.dataset.sources);
@@ -2647,7 +2714,10 @@
                                                 if (s.meta) metaHtml = `<span style="color:#10b981">${s.meta}</span>`;
                                                 
                                                 card.innerHTML = `
-                                                    <a href="${s.url}" target="_blank" class="source-title">[${i+1}] ${s.title}</a>
+                                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                                                        <a href="${s.url}" target="_blank" class="source-title" style="flex:1;">[${i+1}] ${s.title}</a>
+                                                        <button class="source-cite-btn" style="margin-left:8px;padding:2px 6px;font-size:10px;" onclick="window.open('https://api.microlink.io?url=${encodeURIComponent(s.url)}&screenshot=true&embed=screenshot.url', '_blank')">Preview</button>
+                                                    </div>
                                                     <div class="source-meta">
                                                         <span>${new URL(s.url).hostname}</span>
                                                         ${metaHtml}
