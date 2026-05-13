@@ -44,25 +44,27 @@ except Exception as e:
     print("Supabase init error:", e)
     _sb = None
 
-def _get_auth_client(token: str):
-    if not _SB_URL or not _SB_KEY: return None
+@app.route('/api/share', methods=['POST'])
+def share_report():
+    """Create a public share link for a research report."""
+    data = request.json or {}
+    content = data.get('content')
+    sources = data.get('sources')
+    if not _SB_URL or not _SB_KEY: return jsonify({"error": "No SB"}), 500
     try:
-        from supabase import ClientOptions
-        opts = ClientOptions(headers={"Authorization": f"Bearer {token}"})
-        return _sb_create(_SB_URL, _SB_KEY, options=opts)
-    except Exception:
-        pass
-    
-    client = _sb_create(_SB_URL, _SB_KEY)
-    try:
-        client.postgrest.auth(token)
-    except Exception:
-        pass
-    try:
-        client.postgrest.session.headers["Authorization"] = f"Bearer {token}"
-    except Exception:
-        pass
-    return client
+        r = requests.post(f"{_SB_URL}/rest/v1/shared_reports", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}","Prefer":"return=representation"}, json={"content":content,"sources":sources})
+        if r.status_code in (200,201) and r.json():
+            return jsonify({"url": f"{request.host_url}share/{r.json()[0]['id']}"})
+    except: pass
+    return jsonify({"error":"failed"}), 500
+
+@app.route('/share/<report_id>')
+def view_shared(report_id):
+    """Public view for shared research."""
+    r = requests.get(f"{_SB_URL}/rest/v1/shared_reports?id=eq.{report_id}", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
+    if r.status_code == 200 and r.json():
+        return render_template('shared.html', report=r.json()[0])
+    return "Not found", 404
 
 def _get_user_id(token: str):
     """Bypass supabase SDK to get user ID from token."""
@@ -414,23 +416,15 @@ def chat_stream():
             })
 
         def generate_cf():
-            # Vision queries still go through groq_runner
-            if image_data:
-                yield from _cf.stream_chat(
-                    session_id=session_id, message=message,
-                    model_name=model, token=current_token, user_id=user_id,
-                    chat_id=chat_id, image_data=image_data
-                )
-            else:
-                # Retrieve any stored session document to include as context
-                session_doc = _session_docs.get(session_id)
-                # All text queries → research engine
-                yield from _research.stream_research(
-                    session_id=session_id, query=message,
-                    jwt_token=current_token, user_id=user_id, chat_id=chat_id,
-                    deep_dive=deep_dive, sb=_sb, session_doc=session_doc,
-                    lit_review=lit_review
-                )
+            # Retrieve any stored session document to include as context
+            session_doc = _session_docs.get(session_id)
+            # Route ALL queries (text or image) to research engine for visual search
+            yield from _research.stream_research(
+                session_id=session_id, query=message,
+                jwt_token=current_token, user_id=user_id, chat_id=chat_id,
+                deep_dive=deep_dive, sb=_sb, session_doc=session_doc,
+                lit_review=lit_review, image_data=image_data
+            )
 
         headers = {
             "Content-Type":    "text/event-stream",

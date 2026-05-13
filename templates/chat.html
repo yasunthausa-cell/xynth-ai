@@ -18,6 +18,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js"></script>
     <script src="/static/voice.js"></script>
     <!-- Syntax highlighting -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
@@ -2552,7 +2553,14 @@
                                     const stepper = botBubble.querySelector('.research-stepper');
                                     if (stepper) stepper.remove();
                                     
-                                    botBubble.querySelector('.markdown-body').innerHTML = marked.parse(fullText);
+                                    const mdBody = botBubble.querySelector('.markdown-body');
+                                    mdBody.innerHTML = marked.parse(fullText);
+                                    
+                                    // Math & Diagrams
+                                    if (fullText.length % 200 === 0) {
+                                        if (window.renderMathInElement) renderMathInElement(mdBody, { delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}] });
+                                        mermaid.init(undefined, mdBody.querySelectorAll('.language-mermaid'));
+                                    }
                                     chatView.scrollTop = chatView.scrollHeight;
                                 } else if (data.type === 'status') {
                                     if (!fullText) {
@@ -2665,6 +2673,32 @@
                                 } else if (data.type === 'error') {
                                     botBubble.querySelector('.markdown-body').innerHTML += `<br><span style="color:#ef4444">Error: ${data.text}</span>`;
                                 } else if (data.type === 'done') {
+                                    // Math & Mermaid final render
+                                    const mdBody = botBubble.querySelector('.markdown-body');
+                                    if (window.renderMathInElement) renderMathInElement(mdBody, { delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}] });
+                                    mermaid.init(undefined, mdBody.querySelectorAll('.language-mermaid'));
+
+                                    // Share button
+                                    const shareBtn = document.createElement('button');
+                                    shareBtn.className = 'action-btn';
+                                    shareBtn.title = 'Share Research';
+                                    shareBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>';
+                                    shareBtn.onclick = async () => {
+                                        shareBtn.disabled = true;
+                                        try {
+                                            const res = await fetch('/api/share', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ content: fullText, sources: botBubble.dataset.sources })
+                                            });
+                                            const d = await res.json();
+                                            if (d.url) prompt("Copy public research link:", d.url);
+                                        } catch(e) { alert("Sharing failed."); }
+                                        finally { shareBtn.disabled = false; }
+                                    };
+                                    const actions = botBubble.querySelector('.message-actions');
+                                    if (actions) actions.appendChild(shareBtn);
+
                                     // BibTeX button
                                     if (botBubble.dataset.bibtex) {
                                         const actions = botBubble.querySelector('.message-actions');

@@ -42,13 +42,15 @@ STRUCTURE YOUR RESPONSE DYNAMICALLY:
 - Use headings (##) and emojis for complex topics.
 - ALWAYS cite sources INLINE: [Source Name](URL).
 - DO NOT use generic numbers like [1].
+- VISUAL DIAGRAMS: Use Mermaid syntax (```mermaid ... ```) to create flowcharts or diagrams for complex processes.
+- MATH: Use LaTeX for all mathematical expressions. Use $ ... $ for inline and $$ ... $$ for block math.
 
 CONCISENESS:
 - Unless 'Deep Dive' is active, be concise (2-4 paragraphs max).
 - If it's a greeting or simple fact, be very brief.
 
 IDENTITY:
-- You are Resynth Research by Resynth Inc. Reply in the user's language. Do not repeat introductions."""
+- You are Resynth Research by Resynth Inc. Reply in the user's language. Do not repeat introductions. """
 
 LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
 Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
@@ -527,7 +529,7 @@ def _ai_simple_reply(query: str, mode: str) -> str:
     except: return "I'm here to help with your research. What would you like to explore?"
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, image_data=None):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -535,6 +537,27 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         return
 
     history = _conversations.get(session_id, [])
+
+    # ── Step 0: Visual Research (Vision Analysis) ──────────────────────────
+    vision_context = ""
+    if image_data:
+        yield f'data: {json.dumps({"type": "status", "id": "vision", "text": "👁️ Analyzing your image for research context..."})}\n\n'
+        try:
+            # Use Qwen-VL or similar via Dashscope
+            resp = client.chat.completions.create(
+                model="qwen-vl-plus",
+                messages=[
+                    {"role": "user", "content": [
+                        {"type": "text", "text": "Describe this image in detail for a research assistant. Identify any charts, text, or objects that might be relevant for a web search."},
+                        {"type": "image_url", "image_url": {"url": image_data if image_data.startswith("http") else f"data:image/jpeg;base64,{image_data}"}}
+                    ]}
+                ],
+                max_tokens=300
+            )
+            vision_context = f"\n\n[IMAGE ANALYSIS]: {resp.choices[0].message.content}\n"
+            query = f"{query}\n(Visual Context: {vision_context})"
+        except Exception as e:
+            print("Vision error:", e)
 
     # ── Detect and fetch URLs or ArXiv IDs embedded in the query ──────────────────
     urls_in_query = URL_PATTERN.findall(query)
