@@ -60,6 +60,19 @@ IDENTITY (CRITICAL):
 
 Be academically rigorous, precise, and highly readable."""
 
+LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
+Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
+
+CRITICAL INSTRUCTIONS:
+1. THEMATIC SYNTHESIS: Do not just list summaries. Organize your response by themes, concepts, or conflicting findings across different sources.
+2. SOURCE COMPARISON: Explicitly mention where sources agree or disagree. Example: "[Source A] suggests X, however, [Source B] found Y."
+3. GAP IDENTIFICATION: Point out any missing information or "gaps" in the current research as represented by the sources.
+4. STRUCTURE: Use academic headings like ## Executive Summary, ## Current State of Research, ## Comparative Analysis, ## Key Methodologies (if applicable), and ## Conclusion.
+5. CITATIONS: Use the source names as clickable inline links.
+6. TONE: Maintain a high-level, objective, and scholarly tone.
+
+Reply in the same language as the user query."""
+
 DECOMPOSE_PROMPT = """Break this research query into 3 focused sub-queries for comprehensive research.
 If the user's query contains typos, misspellings, or bad grammar, automatically correct them in your mind before creating the sub-queries.
 Return ONLY a JSON array of 3 strings. Example: ["sub-query 1", "sub-query 2", "sub-query 3"]
@@ -246,16 +259,50 @@ def _search_one(query: str) -> list[dict]:
     is_academic = any(w in query_lower for w in ["arxiv", "paper", "pubmed", "scholar", "study", "journal", "research"])
     
     if is_academic:
-        # 1a. Try Google Scholar via scholarly
+        # 1a. Semantic Scholar (Very High Quality)
+        try:
+            import requests
+            ss_url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=3&fields=title,url,abstract,authors,year,citationCount"
+            r_ss = requests.get(ss_url, timeout=10)
+            if r_ss.status_code == 200:
+                ss_data = r_ss.json().get("data", [])
+                results = []
+                for paper in ss_data:
+                    title = paper.get("title")
+                    abstract = paper.get("abstract") or "No abstract available."
+                    url = paper.get("url") or f"https://www.semanticscholar.org/paper/{paper.get('paperId')}"
+                    authors = ", ".join([a.get("name") for a in paper.get("authors", [])])
+                    year = paper.get("year", "n.d.")
+                    citation = f"{authors} ({year}). {title}."
+                    results.append({
+                        "title": title, 
+                        "url": url, 
+                        "body": abstract,
+                        "citation": citation,
+                        "meta": f"Citations: {paper.get('citationCount', 0)}"
+                    })
+                if results: return results
+        except Exception as e_ss:
+            print(f"[Search] Semantic Scholar failed: {e_ss}")
+
+        # 1b. Try Google Scholar via scholarly
         try:
             from scholarly import scholarly as _scholarly
             results = []
             for pub in _scholarly.search_pubs(query):
-                title = pub.get("bib", {}).get("title", "")
-                abstract = pub.get("bib", {}).get("abstract", "")
+                bib = pub.get("bib", {})
+                title = bib.get("title", "")
+                abstract = bib.get("abstract", "")
                 pub_url = pub.get("pub_url", "")
+                author = bib.get("author", ["Unknown"])[0]
+                year = bib.get("pub_year", "n.d.")
                 if title and abstract:
-                    results.append({"title": title, "url": pub_url, "body": abstract})
+                    results.append({
+                        "title": title, 
+                        "url": pub_url, 
+                        "body": abstract,
+                        "citation": f"{author} ({year}). {title}."
+                    })
                 if len(results) >= 3:
                     break
             if results:
@@ -483,7 +530,7 @@ def _ai_reject(query: str) -> str:
         return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -492,19 +539,29 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
 
     history = _conversations.get(session_id, [])
 
-    # ── Detect and fetch URLs embedded in the query ───────────────────────────────
+    # ── Detect and fetch URLs or ArXiv IDs embedded in the query ──────────────────
     urls_in_query = URL_PATTERN.findall(query)
+    # Also detect plain ArXiv IDs like 2401.00001
+    arxiv_ids = _re.findall(r'\b\d{4}\.\d{4,5}(?:v\d+)?\b', query)
+    
     fetched_url_context = ""
-    if urls_in_query:
-        yield f"data: {json.dumps({'type': 'status', 'text': f'\ud83d\udd17 Fetching {len(urls_in_query)} linked source(s)...'})}\n\n"
-        for u in urls_in_query[:3]:  # cap at 3 URLs
+    if urls_in_query or arxiv_ids:
+        status_msg = "\U0001f517 Fetching linked academic source(s)..."
+        yield f'data: {json.dumps({"type": "status", "id": "urls", "text": status_msg})}\n\n'
+        
+        # Handle plain ArXiv IDs by turning them into URLs
+        for aid in arxiv_ids[:2]:
+            urls_in_query.append(f"https://arxiv.org/abs/{aid}")
+
+        for u in list(dict.fromkeys(urls_in_query))[:3]:  # dedupe + cap at 3
             content = _fetch_url_content(u)
             if content and not content.startswith("[Could not"):
-                fetched_url_context += f"\n\n[FETCHED URL: {u}]\n{content}"
+                fetched_url_context += f"\n\n[FETCHED SOURCE: {u}]\n{content}"
 
     # ── Guard: reject off-topic — AI crafts personalized reply ───────────────
     if not _is_research_query(query, history):
-        yield f"data: {json.dumps({'type': 'status', 'text': '🤔 Thinking...'})}\n\n"
+        think_msg = '🤔 Thinking...'
+        yield f'data: {json.dumps({"type": "status", "text": think_msg})}\n\n'
         msg = _ai_reject(query)
         yield f"data: {json.dumps({'type': 'token', 'text': msg})}\n\n"
         
@@ -550,25 +607,33 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         return
 
     # Decide if we need to search
-    should_search = deep_dive or _needs_search(query, history)
+    should_search = deep_dive or lit_review or _needs_search(query, history)
     results = []
 
     if should_search:
         # Step 1: Decompose
-        if deep_dive:
-            yield f"data: {json.dumps({'type': 'status', 'text': '🌊 Deep Dive enabled. Analyzing query...'})}\n\n"
+        if lit_review:
+            yield f"data: {json.dumps({'type': 'status', 'id': 'plan', 'text': '📚 Lit Review mode active. Building scholarly search plan...'})}\n\n"
+        elif deep_dive:
+            yield f"data: {json.dumps({'type': 'status', 'id': 'plan', 'text': '🌊 Deep Dive enabled. Analyzing research plan...'})}\n\n"
         else:
-            yield f"data: {json.dumps({'type': 'status', 'text': '🔬 Analyzing your research query...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'id': 'plan', 'text': '🔬 Analyzing your research query...'})}\n\n"
             
         sub_queries = _decompose_query(query, history)
-        yield f"data: {json.dumps({'type': 'status', 'text': f'🔍 Searching {len(sub_queries)} angles in parallel...'})}\n\n"
+        if lit_review:
+            # Force more academic sub-queries
+            sub_queries = [q + " literature review papers" for q in sub_queries]
+            
+        search_msg = f"🔍 Searching {len(sub_queries)} angles in parallel..."
+        yield f'data: {json.dumps({"type": "status", "id": "search", "text": search_msg})}\n\n'
 
         # Step 2: Parallel search
         results = _parallel_search(sub_queries)
         yield f"data: {json.dumps({'type': 'sources', 'sources': results})}\n\n"
-        yield f"data: {json.dumps({'type': 'status', 'text': f'📖 Found {len(results)} sources. Synthesizing report...'})}\n\n"
+        sources_msg = f"📖 Found {len(results)} sources. Extracting key insights..."
+        yield f'data: {json.dumps({"type": "status", "id": "sources", "text": sources_msg})}\n\n'
     else:
-        yield f"data: {json.dumps({'type': 'status', 'text': '🧠 Answering from knowledge base...'})}\n\n"
+        yield f"data: {json.dumps({'type': 'status', 'id': 'plan', 'text': '🧠 Answering from knowledge base...'})}\n\n"
 
     # Step 3: Check RAG documents
     rag_context = ""
@@ -578,7 +643,8 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
             chunks = retrieve_relevant_chunks(query, user_id, sb)
             if chunks:
                 rag_context = "\n\n[USER DOCUMENTS — RAG]\n" + "\n---\n".join(chunks)
-                yield f"data: {json.dumps({'type': 'status', 'text': '📁 Found relevant content in your documents...'})}\n\n"
+                rag_msg = '📁 Cross-referencing your personal document library...'
+                yield f'data: {json.dumps({"type": "status", "id": "rag", "text": rag_msg})}\n\n'
         except Exception as e:
             print("RAG retrieve error:", e)
 
@@ -586,7 +652,8 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     session_doc_context = ""
     if session_doc:
         session_doc_context = f"\n\n[ATTACHED DOCUMENT — USER UPLOADED THIS SESSION]\n{session_doc[:12000]}"
-        yield f"data: {json.dumps({'type': 'status', 'text': '📎 Reading your attached document...'})}\n\n"
+        doc_msg = '📎 Analyzing your attached paper...'
+        yield f'data: {json.dumps({"type": "status", "id": "doc", "text": doc_msg})}\n\n'
 
     # Step 4: Build prompt and stream report
     source_text = _format_sources(results)
@@ -598,7 +665,11 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         + f"\n\nResearch query: {query}"
     )
 
-    dynamic_system_prompt = RESEARCH_SYSTEM_PROMPT + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
+    synth_msg = '🧠 Synthesizing comprehensive research report...' if not lit_review else '📚 Synthesizing formal literature review...'
+    yield f'data: {json.dumps({"type": "status", "id": "synth", "text": synth_msg})}\n\n'
+
+    base_prompt = LIT_REVIEW_PROMPT if lit_review else RESEARCH_SYSTEM_PROMPT
+    dynamic_system_prompt = base_prompt + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
     messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
     messages.append({"role": "user", "content": augmented})
@@ -667,14 +738,16 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
 
     # ── Step 5: Image search (if requested or visual topic) ──────────────────
     if _wants_images(query):
-        yield f"data: {json.dumps({'type': 'status', 'text': '🖼️ Fetching relevant images...'})}\n\n"
+        img_status = '🖼️ Fetching relevant images...'
+        yield f'data: {json.dumps({"type": "status", "text": img_status})}\n\n'
         images = _search_images(query, max_images=4)
         if images:
             yield f"data: {json.dumps({'type': 'images', 'images': images})}\n\n"
 
     # ── Step 6: PDF generation (if requested) ────────────────────────────────
     if _wants_pdf(query):
-        yield f"data: {json.dumps({'type': 'status', 'text': '📄 Generating PDF report...'})}\n\n"
+        pdf_status = '📄 Generating PDF report...'
+        yield f'data: {json.dumps({"type": "status", "text": pdf_status})}\n\n'
         try:
             from pdf_utils import generate_research_pdf
             pdf_url = generate_research_pdf(

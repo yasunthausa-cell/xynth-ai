@@ -884,6 +884,119 @@
         }
         .doc-banner-clear:hover { color: #ef4444; }
 
+        .doc-banner-clear:hover { color: #ef4444; }
+
+        /* --- Research Stepper (Visual Progress) --- */
+        .research-stepper {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            margin-bottom: 20px;
+            animation: heroFadeUp 0.5s ease both;
+        }
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+        .step-item.active { color: var(--text-primary); }
+        .step-item.completed { color: #10b981; }
+        .step-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: -1px;
+            background: var(--bg);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .step-item.active .step-icon {
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(59,130,246,0.3);
+        }
+        .step-item.completed .step-icon {
+            border-color: #10b981;
+            background: #10b981;
+            color: white;
+        }
+        .step-line {
+            position: absolute;
+            top: 20px;
+            left: 9px;
+            width: 2px;
+            height: 12px;
+            background: var(--border);
+        }
+        .step-item:last-child .step-line { display: none; }
+        .step-item.completed .step-line { background: #10b981; }
+        
+        .thinking-orb-small {
+            width: 8px; height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulseOrb 1.5s infinite ease-in-out;
+        }
+
+        .doc-banner-clear:hover { color: #ef4444; }
+
+        /* --- Source Cards (Improved) --- */
+        .source-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: border-color 0.2s;
+        }
+        .source-card:hover { border-color: var(--accent); }
+        .source-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .source-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .source-cite-btn {
+            background: rgba(59,130,246,0.1);
+            color: var(--accent);
+            border: 1px solid rgba(59,130,246,0.2);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            width: fit-content;
+            transition: all 0.2s;
+        }
+        .source-cite-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+
         /* --- Input Area --- */
         .input-area {
             padding: 12px 16px 16px;
@@ -984,9 +1097,9 @@
             width: max-content;
         }
         .deep-dive-btn.active {
-            background: white;
-            color: black;
-            border-color: white;
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--accent);
+            color: var(--accent);
         }
 
         /* --- Countdown --- */
@@ -1418,9 +1531,13 @@
                         <button class="icon-btn" id="addFileBtn" title="Add File">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
-                        <button id="deepDiveBtn" class="deep-dive-btn" style="padding: 8px 16px; font-size: 13px; border-radius: 14px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 12a4 4 0 0 1-8 0"></path></svg>
+                        <button id="deepDiveBtn" class="deep-dive-btn" style="padding: 8px 16px; font-size: 12px; border-radius: 12px; height: 36px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 12a4 4 0 0 1-8 0"></path></svg>
                             <span id="deepDiveText">Deep Dive</span>
+                        </button>
+                        <button id="litReviewBtn" class="deep-dive-btn" style="padding: 8px 16px; font-size: 12px; border-radius: 12px; height: 36px; background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.2); color: #a78bfa;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                            <span id="litReviewText">Lit Review</span>
                         </button>
                     </div>
                     <div style="display: flex; gap: 6px; align-items: center;">
@@ -1807,23 +1924,29 @@
             document.getElementById('sidebar').classList.remove('open');
         });
 
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', (e) => {
-            const sidebar = document.getElementById('sidebar');
-            const toggleBtn = document.getElementById('toggleSidebarBtn');
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !toggleBtn.contains(e.target) && sidebar.classList.contains('open')) {
-                    sidebar.classList.remove('open');
-                }
-            }
         });
 
         let isDeepDive = false;
-        document.getElementById('deepDiveBtn').addEventListener('click', function() {
-            isDeepDive = !isDeepDive;
-            this.classList.toggle('active', isDeepDive);
-            document.getElementById('deepDiveText').textContent = isDeepDive ? 'Deep Diving...' : 'Deep Dive';
-        });
+        let isLitReview = false;
+
+        const deepDiveBtn = document.getElementById('deepDiveBtn');
+        const litReviewBtn = document.getElementById('litReviewBtn');
+
+        if (deepDiveBtn) {
+            deepDiveBtn.addEventListener('click', function() {
+                isDeepDive = !isDeepDive;
+                this.classList.toggle('active', isDeepDive);
+                document.getElementById('deepDiveText').textContent = isDeepDive ? 'Deep Diving...' : 'Deep Dive';
+            });
+        }
+
+        if (litReviewBtn) {
+            litReviewBtn.addEventListener('click', function() {
+                isLitReview = !isLitReview;
+                this.classList.toggle('active', isLitReview);
+                document.getElementById('litReviewText').textContent = isLitReview ? 'Reviewing...' : 'Literature Review';
+            });
+        }
 
         // Handle suggestion chips
         document.querySelectorAll('.suggestion-chip').forEach(chip => {
@@ -2111,7 +2234,6 @@
                 bubble.appendChild(textDiv);
                 msgDiv.appendChild(bubble);
                 
-                // Add actions for bot
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'message-actions';
                 
@@ -2124,6 +2246,38 @@
                     copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
                     setTimeout(() => copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>', 2000);
                 };
+
+                const ttsBtn = document.createElement('button');
+                ttsBtn.className = 'action-btn';
+                ttsBtn.title = "Listen";
+                ttsBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+                ttsBtn.onclick = () => {
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.cancel();
+                        ttsBtn.style.color = '';
+                        return;
+                    }
+                    const utterance = new SpeechSynthesisUtterance(bubble.innerText);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    utterance.onstart = () => ttsBtn.style.color = 'var(--accent)';
+                    utterance.onend = () => ttsBtn.style.color = '';
+                    window.speechSynthesis.speak(utterance);
+                };
+
+                const mdBtn = document.createElement('button');
+                mdBtn.className = 'action-btn';
+                mdBtn.title = "Export Markdown";
+                mdBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+                mdBtn.onclick = () => {
+                    const blob = new Blob([text], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `research_report_${new Date().getTime()}.md`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
                 
                 const regenBtn = document.createElement('button');
                 regenBtn.className = 'action-btn';
@@ -2132,7 +2286,6 @@
                 regenBtn.onclick = () => {
                     if (isGenerating) return;
                     msgDiv.remove(); // Remove current bot response
-                    // Find and remove previous user message if needed, or just send lastUserMessage
                     if (lastUserMessage) {
                         messageInput.value = lastUserMessage;
                         send();
@@ -2260,7 +2413,8 @@
                         message: text, 
                         model: model,
                         image_data: payloadImageData,
-                        deep_dive: isDeepDive
+                        deep_dive: isDeepDive,
+                        lit_review: isLitReview
                     }),
                     signal: abortController.signal
                 });
@@ -2288,11 +2442,46 @@
                                 const data = JSON.parse(dataStr);
                                 if (data.type === 'token') {
                                     fullText += data.text;
+                                    // Remove stepper if text starts arriving
+                                    const stepper = botBubble.querySelector('.research-stepper');
+                                    if (stepper) stepper.remove();
+                                    
                                     botBubble.querySelector('.markdown-body').innerHTML = marked.parse(fullText);
                                     chatView.scrollTop = chatView.scrollHeight;
                                 } else if (data.type === 'status') {
                                     if (!fullText) {
-                                        botBubble.querySelector('.markdown-body').innerHTML = `<div class="thinking-indicator"><div class="thinking-orb"></div><span>${data.text}</span><div class="thinking-dots-wrap"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>`;
+                                        let stepper = botBubble.querySelector('.research-stepper');
+                                        if (!stepper) {
+                                            botBubble.querySelector('.markdown-body').innerHTML = '<div class="research-stepper"></div>';
+                                            stepper = botBubble.querySelector('.research-stepper');
+                                        }
+                                        
+                                        // If data has an ID, we update or add that specific step
+                                        const stepId = data.id || 'current';
+                                        let stepEl = stepper.querySelector(`[data-step="${stepId}"]`);
+                                        
+                                        if (!stepEl) {
+                                            // Mark previous active steps as completed
+                                            stepper.querySelectorAll('.step-item.active').forEach(s => {
+                                                s.classList.remove('active');
+                                                s.classList.add('completed');
+                                                const icon = s.querySelector('.step-icon');
+                                                icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                                            });
+
+                                            stepEl = document.createElement('div');
+                                            stepEl.className = 'step-item active';
+                                            stepEl.dataset.step = stepId;
+                                            stepEl.innerHTML = `
+                                                <div class="step-icon"><div class="thinking-orb-small"></div></div>
+                                                <div class="step-line"></div>
+                                                <div class="step-text">${data.text}</div>
+                                            `;
+                                            stepper.appendChild(stepEl);
+                                        } else {
+                                            stepEl.querySelector('.step-text').textContent = data.text;
+                                        }
+                                        chatView.scrollTop = chatView.scrollHeight;
                                     }
                                 } else if (data.type === 'sources') {
                                     // Inject a sources panel after the answer renders
@@ -2355,13 +2544,44 @@
                                             const sid = 'src_' + Date.now();
                                             const wrap = document.createElement('div');
                                             wrap.style.cssText = 'margin-top:14px;border-top:1px solid var(--border);padding-top:10px';
-                                            wrap.innerHTML = `<button onclick="document.getElementById('${sid}').style.display=document.getElementById('${sid}').style.display==='none'?'flex':'none'; this.innerText = document.getElementById('${sid}').style.display==='none' ? '📚 ${sources.length} Sources — click to expand' : '📚 ${sources.length} Sources — click to collapse';" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0">📚 ${sources.length} Sources — click to expand</button>
-                                            <div id="${sid}" style="display:none;margin-top:8px;flex-direction:column;gap:4px">`
-                                            + sources.map((s,i) => `<a href="${s.url}" target="_blank" style="font-size:12px;color:var(--text2);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border)">[${i+1}] ${s.title}</a>`).join('')
-                                            + `</div>`;
+                                            
+                                            const header = document.createElement('button');
+                                            header.style.cssText = 'background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;margin-bottom:8px';
+                                            header.innerText = `📚 ${sources.length} Sources — click to expand`;
+                                            
+                                            const list = document.createElement('div');
+                                            list.id = sid;
+                                            list.style.cssText = 'display:none;flex-direction:column;gap:8px';
+                                            
+                                            header.onclick = () => {
+                                                const hidden = list.style.display === 'none';
+                                                list.style.display = hidden ? 'flex' : 'none';
+                                                header.innerText = hidden ? `📚 ${sources.length} Sources — click to collapse` : `📚 ${sources.length} Sources — click to expand`;
+                                            };
+
+                                            sources.forEach((s, i) => {
+                                                const card = document.createElement('div');
+                                                card.className = 'source-card';
+                                                
+                                                let metaHtml = '';
+                                                if (s.meta) metaHtml = `<span style="color:#10b981">${s.meta}</span>`;
+                                                
+                                                card.innerHTML = `
+                                                    <a href="${s.url}" target="_blank" class="source-title">[${i+1}] ${s.title}</a>
+                                                    <div class="source-meta">
+                                                        <span>${new URL(s.url).hostname}</span>
+                                                        ${metaHtml}
+                                                    </div>
+                                                    <button class="source-cite-btn" onclick="navigator.clipboard.writeText('${(s.citation || s.title).replace(/'/g, "\\'")}'); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy Citation', 2000)">Copy Citation</button>
+                                                `;
+                                                list.appendChild(card);
+                                            });
+
+                                            wrap.appendChild(header);
+                                            wrap.appendChild(list);
                                             botBubble.appendChild(wrap);
                                         }
-                                    } catch(e) {}
+                                    } catch(e) { console.error("Source render error", e); }
                                 }
                             } catch (e) {
                                 console.error("JSON parse error on SSE chunk", e, dataStr);

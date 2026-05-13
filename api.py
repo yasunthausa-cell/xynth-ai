@@ -357,6 +357,7 @@ def chat_stream():
         image_data = data.get("image_data", None)
 
         deep_dive  = bool(data.get("deep_dive", False))
+        lit_review = bool(data.get("lit_review", False))
 
         # Handle document attachments (PDF/TXT/DOCX) — extract text + store in session
         if image_data and image_data.startswith("data:"):
@@ -427,7 +428,8 @@ def chat_stream():
                 yield from _research.stream_research(
                     session_id=session_id, query=message,
                     jwt_token=current_token, user_id=user_id, chat_id=chat_id,
-                    deep_dive=deep_dive, sb=_sb, session_doc=session_doc
+                    deep_dive=deep_dive, sb=_sb, session_doc=session_doc,
+                    lit_review=lit_review
                 )
 
         headers = {
