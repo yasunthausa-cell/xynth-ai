@@ -760,4 +760,22 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         except Exception as e:
             print("PDF error:", e)
 
+    # ── Step 7: Related Questions ──────────────────────────────────────────
+    try:
+        followup_prompt = f"Based on this research report about '{query}', suggest 3 concise follow-up research questions that a user might want to ask next. Return ONLY a JSON array of 3 strings. Example: [\"question 1\", \"question 2\", \"question 3\"]"
+        resp = client.chat.completions.create(
+            model=FAST_MODEL,
+            messages=[{"role": "system", "content": "You are a research assistant. Output ONLY valid JSON array."}, 
+                      {"role": "user", "content": followup_prompt}],
+            max_tokens=150,
+            temperature=0.7,
+        )
+        import re
+        match = re.search(r'\[.*\]', resp.choices[0].message.content.strip(), re.DOTALL)
+        if match:
+            followups = json.loads(match.group(0))
+            yield f"data: {json.dumps({'type': 'followups', 'questions': followups})}\n\n"
+    except Exception as e:
+        print("Follow-up error:", e)
+
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
