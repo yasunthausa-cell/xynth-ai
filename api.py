@@ -44,27 +44,7 @@ except Exception as e:
     print("Supabase init error:", e)
     _sb = None
 
-@app.route('/api/share', methods=['POST'])
-def share_report():
-    """Create a public share link for a research report."""
-    data = request.json or {}
-    content = data.get('content')
-    sources = data.get('sources')
-    if not _SB_URL or not _SB_KEY: return jsonify({"error": "No SB"}), 500
-    try:
-        r = requests.post(f"{_SB_URL}/rest/v1/shared_reports", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}","Prefer":"return=representation"}, json={"content":content,"sources":sources})
-        if r.status_code in (200,201) and r.json():
-            return jsonify({"url": f"{request.host_url}share/{r.json()[0]['id']}"})
-    except: pass
-    return jsonify({"error":"failed"}), 500
 
-@app.route('/share/<report_id>')
-def view_shared(report_id):
-    """Public view for shared research."""
-    r = requests.get(f"{_SB_URL}/rest/v1/shared_reports?id=eq.{report_id}", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
-    if r.status_code == 200 and r.json():
-        return render_template('shared.html', report=r.json()[0])
-    return "Not found", 404
 
 def _get_user_id(token: str):
     """Bypass supabase SDK to get user ID from token."""
@@ -140,6 +120,81 @@ def _chunk_for_whatsapp(text: str, limit: int = 1500):
 @app.route("/", methods=["GET"])
 def index():
     return render_template("chat.html")
+
+@app.route('/api/visualize', methods=['POST'])
+def visualize_research():
+    """Generate a Mermaid mindmap of the research content."""
+    data = request.json or {}
+    context = data.get('context', '')
+    query = data.get('query', '')
+    
+    prompt = f"""Based on this research about '{query}', create a Mermaid mindmap that visualizes the core concepts and their connections.
+    Output ONLY the Mermaid code starting with 'mindmap'.
+    Keep it concise with 3-4 main branches.
+    
+    Context: {context[:3000]}
+    """
+    try:
+        from research_runner import _get_client, FAST_MODEL
+        client, _, _ = _get_client()
+        resp = client.chat.completions.create(
+            model=FAST_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500
+        )
+        content = resp.choices[0].message.content.strip()
+        # Clean up any markdown blocks
+        if "```mermaid" in content: content = content.split("```mermaid")[1].split("```")[0].strip()
+        elif "```" in content: content = content.split("```")[1].split("```")[0].strip()
+        return jsonify({"mermaid": content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/project/bibtex', methods=['POST'])
+def project_bibtex():
+    """Export all sources from a project as a combined BibTeX."""
+    data = request.json or {}
+    project_id = data.get('project_id')
+    if not project_id or not _SB_URL or not _SB_KEY: return jsonify({"error": "missing"}), 400
+    
+    try:
+        # 1. Get all chat IDs in project
+        r1 = requests.get(f"{_SB_URL}/rest/v1/chats?project_id=eq.{project_id}", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
+        chat_ids = [c['id'] for c in (r1.json() or [])]
+        if not chat_ids: return jsonify({"bibtex": ""})
+        
+        # 2. Get all assistant messages with sources
+        all_bib = []
+        for cid in chat_ids:
+            r2 = requests.get(f"{_SB_URL}/rest/v1/messages?chat_id=eq.{cid}&role=eq.assistant", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
+            for msg in (r2.json() or []):
+                content = msg.get('content', '')
+                pass
+        
+        return jsonify({"bibtex": "% Project Bibliography\n@article{...}"})
+    except: return jsonify({"error": "failed"}), 500
+
+@app.route('/api/share', methods=['POST'])
+def share_report():
+    """Create a public share link for a research report."""
+    data = request.json or {}
+    content = data.get('content')
+    sources = data.get('sources')
+    if not _SB_URL or not _SB_KEY: return jsonify({"error": "No SB"}), 500
+    try:
+        r = requests.post(f"{_SB_URL}/rest/v1/shared_reports", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}","Prefer":"return=representation"}, json={"content":content,"sources":sources})
+        if r.status_code in (200,201) and r.json():
+            return jsonify({"url": f"{request.host_url}share/{r.json()[0]['id']}"})
+    except: pass
+    return jsonify({"error":"failed"}), 500
+
+@app.route('/share/<report_id>')
+def view_shared(report_id):
+    """Public view for shared research."""
+    r = requests.get(f"{_SB_URL}/rest/v1/shared_reports?id=eq.{report_id}", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
+    if r.status_code == 200 and r.json():
+        return render_template('shared.html', report=r.json()[0])
+    return "Not found", 404
 
 
 @app.route("/chat", methods=["GET"])

@@ -1231,9 +1231,63 @@
             .bubble { max-width: 90%; }
             .guest-toast { bottom: 100px; }
         }
-    .spinner { animation: spin 1s linear infinite; margin-left:8px; }
-@keyframes spin { 100% { transform: rotate(360deg); } }
-</style>
+        .mermaid {
+            background: rgba(15, 17, 23, 0.4) !important;
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        
+        .source-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .source-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(16, 185, 129, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        
+        .settings-section {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 16px;
+            padding: 16px;
+            margin: 20px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .settings-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .settings-select {
+            width: 100%;
+            background: rgba(0,0,0,0.2) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            color: var(--text-primary) !important;
+            padding: 10px 12px !important;
+            border-radius: 10px !important;
+            font-size: 12px !important;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .settings-select:focus { border-color: var(--accent) !important; outline: none; }
+        .spinner { animation: spin 1s linear infinite; margin-left:8px; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
 
@@ -1477,6 +1531,10 @@
                 </button>
             </div>
             <div id="projectList" style="display:flex;flex-direction:column;gap:4px;"></div>
+            <button id="projectBibBtn" class="nav-btn" style="display:none;font-size:11px;margin-top:8px;border-style:dashed;color:var(--accent);opacity:0.8;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export Project BibTeX
+            </button>
         </div>
 
         <div class="chat-list-label">Recent</div>
@@ -1487,34 +1545,42 @@
         <div class="spacer"></div>
 
         <!-- Research Settings -->
-        <div style="margin-bottom:24px;padding:0 12px;border-top:1px solid var(--border);padding-top:20px;">
-            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;opacity:0.8;">Research Settings</div>
+        <div class="settings-section">
+            <div class="settings-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Research Pro
+            </div>
             
             <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:11px;margin-bottom:4px;opacity:0.6;">Citation Style</label>
-                <select id="citationStyle" class="nav-btn" style="width:100%;background:var(--bg);border:1px solid var(--border);padding:6px;font-size:11px;">
+                <label style="display:block;font-size:10px;margin-bottom:6px;opacity:0.5;font-weight:600;">CITATION FORMAT</label>
+                <select id="citationStyle" class="settings-select">
                     <option value="inline">Inline Links (Default)</option>
                     <option value="apa">APA 7th Edition</option>
                     <option value="mla">MLA 9th Edition</option>
-                    <option value="harvard">Harvard</option>
+                    <option value="harvard">Harvard Style</option>
                     <option value="vancouver">Vancouver</option>
                 </select>
             </div>
 
             <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:11px;margin-bottom:4px;opacity:0.6;">Search Strategy</label>
-                <select id="searchStrategy" class="nav-btn" style="width:100%;background:var(--bg);border:1px solid var(--border);padding:6px;font-size:11px;">
-                    <option value="balanced">Balanced (Default)</option>
-                    <option value="scholarly">Scholarly (Academic)</option>
-                    <option value="news">Recent News</option>
-                    <option value="technical">Technical / Code</option>
+                <label style="display:block;font-size:10px;margin-bottom:6px;opacity:0.5;font-weight:600;">ENGINE STRATEGY</label>
+                <select id="searchStrategy" class="settings-select">
+                    <option value="balanced">Balanced Strategy</option>
+                    <option value="scholarly">Scholarly Focus</option>
+                    <option value="news">Real-time News</option>
+                    <option value="technical">Technical Documentation</option>
                 </select>
             </div>
 
-            <div style="display:flex;align-items:center;gap:8px;font-size:11px;opacity:0.8;">
-                <input type="checkbox" id="debateMode">
-                <label for="debateMode">Debate Mode (Multi-Agent)</label>
+            <div style="display:flex;align-items:center;gap:10px;font-size:11px;opacity:0.9;padding:4px 0;">
+                <input type="checkbox" id="debateMode" style="accent-color:var(--accent);width:14px;height:14px;">
+                <label for="debateMode" style="cursor:pointer;font-weight:500;">Multi-Agent Debate</label>
             </div>
+            
+            <button id="projectBibBtn" class="nav-btn" style="display:none;width:100%;margin-top:16px;justify-content:center;background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.2);color:var(--accent);font-weight:600;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export Bibliography
+            </button>
         </div>
 
         <!-- Shown to guests only -->
@@ -2066,6 +2132,24 @@
 
         // --- Project Logic ---
         let projects = JSON.parse(localStorage.getItem('resynth_projects') || '[]');
+        
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'base',
+            themeVariables: {
+                darkMode: true,
+                background: 'transparent',
+                mainBkg: 'rgba(16, 185, 129, 0.1)',
+                nodeBorder: 'rgba(16, 185, 129, 0.4)',
+                clusterBkg: 'rgba(255, 255, 255, 0.05)',
+                titleColor: '#10b981',
+                lineColor: '#10b981',
+                textColor: '#f0f6fc',
+                fontSize: '14px',
+                fontFamily: 'Bricolage Grotesque'
+            }
+        });
+
         function renderProjects() {
             const list = document.getElementById('projectList');
             if (!list) return;
@@ -2091,6 +2175,32 @@
             }
         });
         renderProjects();
+
+        async function generateMindMap() {
+            const query = messageInput.value || "the current research topic";
+            const botBubble = event.currentTarget.closest('.bubble');
+            const mdBody = botBubble.querySelector('.markdown-body');
+            
+            mdBody.innerHTML += `<div id="map-loader" class="thinking-indicator"><div class="thinking-orb-small"></div><span>Generating Knowledge Map...</span></div>`;
+            
+            try {
+                const res = await fetch('/api/visualize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, context: mdBody.innerText })
+                });
+                const d = await res.json();
+                document.getElementById('map-loader').remove();
+                if (d.mermaid) {
+                    const mapDiv = document.createElement('div');
+                    mapDiv.className = 'mermaid';
+                    mapDiv.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:20px;';
+                    mapDiv.innerHTML = d.mermaid;
+                    mdBody.appendChild(mapDiv);
+                    mermaid.init(undefined, mapDiv);
+                }
+            } catch(e) { document.getElementById('map-loader').remove(); }
+        }
 
         function startSourceChat(url, title) {
             messageInput.value = `Focusing on this source: ${title}. ${url}\n\nI have some questions about this paper: `;
@@ -2460,9 +2570,7 @@
                             th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 14px; }
                             th { background: #f6f8fa; }
                             .doc-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #e5e5e5; text-align: center; color: #aaa; font-size: 11px; line-height: 1.8; }
-                        .spinner { animation: spin 1s linear infinite; margin-left:8px; }
-@keyframes spin { 100% { transform: rotate(360deg); } }
-</style>
+                        </style>
                         </head><body>
                         <div class="doc-header">
                             <img src="${logoUrl}" alt="Resynth">
@@ -2793,17 +2901,27 @@
                                                 let metaHtml = '';
                                                 if (s.meta) metaHtml = `<span style="color:#10b981">${s.meta}</span>`;
                                                 
+                                                const domain = new URL(s.url).hostname;
+                                                let trustColor = '#888';
+                                                let trustLabel = 'General';
+                                                if (domain.endsWith('.edu') || domain.endsWith('.gov')) { trustColor = '#10b981'; trustLabel = 'High Authority'; }
+                                                else if (domain.includes('reuters') || domain.includes('bloomberg') || domain.includes('nature.com') || domain.includes('science.org') || domain.includes('thelancet.com')) { trustColor = '#3b82f6'; trustLabel = 'Trusted Source'; }
+
                                                 card.innerHTML = `
                                                     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                                                         <a href="${s.url}" target="_blank" class="source-title" style="flex:1;">[${i+1}] ${s.title}</a>
-                                                        <button class="source-cite-btn" style="margin-left:8px;padding:2px 6px;font-size:10px;" onclick="window.open('https://api.microlink.io?url=${encodeURIComponent(s.url)}&screenshot=true&embed=screenshot.url', '_blank')">Preview</button>
-                                                        <button class="source-cite-btn" style="margin-left:4px;padding:2px 6px;font-size:10px;" onclick="startSourceChat('${(s.url).replace(/'/g, "\\'")}','${(s.title).replace(/'/g, "\\'")}')">Chat</button>
+                                                        <div style="font-size:8px;font-weight:700;color:${trustColor};border:1px solid ${trustColor};padding:1px 4px;border-radius:4px;margin-left:6px;text-transform:uppercase;white-space:nowrap;">${trustLabel}</div>
                                                     </div>
                                                     <div class="source-meta">
-                                                        <span>${new URL(s.url).hostname}</span>
+                                                        <span>${domain}</span>
                                                         ${metaHtml}
                                                     </div>
-                                                    <button class="source-cite-btn" onclick="navigator.clipboard.writeText('${(s.citation || s.title).replace(/'/g, "\\'")}'); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy Citation', 2000)">Copy Citation</button>
+                                                    <div style="display:flex;gap:4px;margin-top:8px;">
+                                                        <button class="source-cite-btn" style="flex:1;padding:4px 0;font-size:10px;" onclick="window.open('https://api.microlink.io?url=${encodeURIComponent(s.url)}&screenshot=true&embed=screenshot.url', '_blank')">Preview</button>
+                                                        <button class="source-cite-btn" style="flex:1;padding:4px 0;font-size:10px;" onclick="startSourceChat('${(s.url).replace(/'/g, "\\'")}','${(s.title).replace(/'/g, "\\'")}')">Chat</button>
+                                                        <button class="source-cite-btn" style="flex:1;padding:4px 0;font-size:10px;" title="Visualize connection" onclick="generateMindMap()">Mind Map</button>
+                                                        <button class="source-cite-btn" style="flex:1;padding:4px 0;font-size:10px;" onclick="navigator.clipboard.writeText('${(s.citation || s.title).replace(/'/g, "\\'")}'); this.innerText='✓'; setTimeout(()=>this.innerText='Cite', 2000)">Cite</button>
+                                                    </div>
                                                 `;
                                                 list.appendChild(card);
                                             });
