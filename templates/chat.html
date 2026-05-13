@@ -29,12 +29,12 @@
     
     <style>
         :root {
-            --bg: #121212;
-            --surface: #1E1E1E;
-            --surface-hover: #2C2C2C;
-            --border: #333333;
+            --bg: #0f1117;
+            --surface: #161a23;
+            --surface-hover: #1e2430;
+            --border: rgba(255, 255, 255, 0.08);
             --text-primary: #FFFFFF;
-            --text-secondary: #A0A0A0;
+            --text-secondary: #94a3b8;
             --accent: #10b981;
             --accent-hover: #059669;
             --gradient-start: #10b981;
@@ -80,13 +80,20 @@
             font-family: var(--font);
         }
 
+        html, body {
+            overflow: hidden;
+            height: 100%;
+            width: 100%;
+            position: fixed;
+            overscroll-behavior: none;
+        }
         body {
             background-color: var(--bg);
             color: var(--text-primary);
             display: flex;
             height: 100vh;
             height: 100dvh;
-            overflow: hidden;
+            touch-action: manipulation;
         }
 
         /* --- Modals --- */
@@ -438,6 +445,9 @@
             flex-direction: column;
             position: relative;
             min-width: 0;
+            width: 100%;
+            max-width: 100vw;
+            overflow: hidden;
         }
 
         .top-nav {
@@ -452,6 +462,7 @@
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             border-bottom: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.3s ease, opacity 0.3s ease;
         }
         .toggle-sidebar {
             background: rgba(255,255,255,0.08);
@@ -459,15 +470,28 @@
             color: var(--text-primary);
             font-size: 18px;
             cursor: pointer;
-            display: flex;
+            display: none; /* Hidden by default, shown in mobile media query */
             align-items: center;
             justify-content: center;
             border-radius: 8px;
             padding: 8px 12px;
             line-height: 1;
-            transition: background 0.2s;
+            transition: all 0.2s;
+        }
+        .toggle-sidebar.sidebar-open {
+            opacity: 0;
+            pointer-events: none;
         }
         .toggle-sidebar:hover { background: rgba(255,255,255,0.15); }
+
+        @media (max-width: 768px) {
+            .toggle-sidebar { display: flex; }
+            .top-nav.hidden-mobile {
+                transform: translateY(-100%);
+                opacity: 0;
+                pointer-events: none;
+            }
+        }
         .model-selector {
             background: transparent;
             border: 1px solid var(--border);
@@ -1103,6 +1127,11 @@
             border-color: var(--accent);
             color: var(--accent);
         }
+        .lit-review-btn.active {
+            background: rgba(167, 139, 250, 0.2) !important;
+            border-color: #a78bfa !important;
+            color: #a78bfa !important;
+        }
 
         /* --- Countdown --- */
         .countdown {
@@ -1537,7 +1566,7 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 12a4 4 0 0 1-8 0"></path></svg>
                             <span id="deepDiveText">Deep Dive</span>
                         </button>
-                        <button id="litReviewBtn" class="deep-dive-btn" style="padding: 8px 16px; font-size: 12px; border-radius: 12px; height: 36px; background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.2); color: #a78bfa;">
+                        <button id="litReviewBtn" class="deep-dive-btn lit-review-btn" style="padding: 8px 16px; font-size: 12px; border-radius: 12px; height: 36px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                             <span id="litReviewText">Lit Review</span>
                         </button>
@@ -1905,9 +1934,14 @@
             localStorage.setItem('xynth_session', sessionId);
             currentChatId = "";
             messagesContainer.innerHTML = '';
-            document.getElementById('suggestions').style.display = 'flex';
+            document.getElementById('suggestions').style.display = 'grid';
             document.getElementById('landingGreeting').style.display = 'block';
-            if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+            
+            // Hide nav on mobile for new chat
+            if (window.innerWidth <= 768) {
+                document.getElementById('topNav').classList.add('hidden-mobile');
+                document.getElementById('sidebar').classList.remove('open');
+            }
         });
 
         
@@ -1915,15 +1949,41 @@
         window.addEventListener('load', () => {
             setTimeout(() => {
                 if (messagesContainer.children.length === 0) {
-                    document.getElementById('suggestions').style.display = 'flex';
+                    document.getElementById('suggestions').style.display = 'grid';
                     document.getElementById('landingGreeting').style.display = 'block';
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('topNav').classList.add('hidden-mobile');
+                    }
                 }
             }, 300); // Wait for chat load
         });
 
-        // second toggle-sidebar listener removed (duplicate)
+        document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
+            const sidebar = document.getElementById('sidebar');
+            const btn = document.getElementById('toggleSidebarBtn');
+            sidebar.classList.add('open');
+            btn.classList.add('sidebar-open');
+        });
+
         document.getElementById('closeSidebarBtn').addEventListener('click', () => {
-            document.getElementById('sidebar').classList.remove('open');
+            const sidebar = document.getElementById('sidebar');
+            const btn = document.getElementById('toggleSidebarBtn');
+            sidebar.classList.remove('open');
+            btn.classList.remove('sidebar-open');
+        });
+
+        // Close sidebar on outside click (mobile)
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const btn = document.getElementById('toggleSidebarBtn');
+                if (sidebar.classList.contains('open') && 
+                    !sidebar.contains(e.target) && 
+                    !btn.contains(e.target)) {
+                    sidebar.classList.remove('open');
+                    btn.classList.remove('sidebar-open');
+                }
+            }
         });
 
         let isDeepDive = false;
@@ -2381,6 +2441,11 @@
             
             document.getElementById('suggestions').style.display = 'none';
             document.getElementById('landingGreeting').style.display = 'none';
+            
+            // Show nav on mobile when conversation starts
+            if (window.innerWidth <= 768) {
+                document.getElementById('topNav').classList.remove('hidden-mobile');
+            }
 
             messageInput.value = '';
             messageInput.style.height = 'auto';
