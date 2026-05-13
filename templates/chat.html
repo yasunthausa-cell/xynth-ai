@@ -1292,7 +1292,7 @@
 <body>
 
     <!-- Auth Modal -->
-    <div id="authModal" class="modal-overlay hidden" id="authModalOverlay">
+    <div id="authModal" class="modal-overlay hidden">
         <div class="modal" style="max-width:420px;padding:0;overflow:hidden;">
             <!-- Header -->
             <div style="display:flex;align-items:center;justify-content:center;padding:24px 24px 0;position:relative;">
@@ -1496,6 +1496,22 @@
         </div>
     </div>
 
+    <!-- Announcement Overlay -->
+    <div id="announcementOverlay" class="announcement-overlay">
+        <div class="announcement-card">
+            <img id="announcementImage" class="announcement-banner" src="" style="display:none;">
+            <div class="announcement-body">
+                <span id="announcementTag" class="announcement-tag">New Feature</span>
+                <h3 id="announcementTitle" class="announcement-title">Welcome to Resynth</h3>
+                <p id="announcementText" class="announcement-text">We've added new research features for you.</p>
+                <div class="announcement-footer">
+                    <button id="announcementCloseBtn" class="announcement-close-btn">Awesome!</button>
+                    <button id="announcementDismissBtn" class="announcement-dismiss">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <div id="sidebar" class="sidebar">
         <div class="brand" style="display:flex; justify-content:space-between; align-items:center;">
@@ -1531,10 +1547,6 @@
                 </button>
             </div>
             <div id="projectList" style="display:flex;flex-direction:column;gap:4px;"></div>
-            <button id="projectBibBtn" class="nav-btn" style="display:none;font-size:11px;margin-top:8px;border-style:dashed;color:var(--accent);opacity:0.8;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Export Project BibTeX
-            </button>
         </div>
 
         <div class="chat-list-label">Recent</div>
@@ -3031,6 +3043,7 @@
         (async function loadAnnouncement() {
             try {
                 const res = await fetch('/api/announcement');
+                if (!res.ok) return;
                 const data = await res.json();
                 if (!data || !data.active) return;
 
@@ -3039,15 +3052,17 @@
                 if (sessionStorage.getItem(dismissedKey)) return;
 
                 const overlay = document.getElementById('announcementOverlay');
+                if (!overlay) return; // Prevent crash if element is missing
+                
                 const tag = document.getElementById('announcementTag');
                 const title = document.getElementById('announcementTitle');
                 const text = document.getElementById('announcementText');
                 const img = document.getElementById('announcementImage');
 
-                if (data.tag) tag.textContent = data.tag;
-                if (data.title) title.textContent = data.title;
-                if (data.message) text.textContent = data.message;
-                if (data.image_url) {
+                if (data.tag && tag) tag.textContent = data.tag;
+                if (data.title && title) title.textContent = data.title;
+                if (data.message && text) text.textContent = data.message;
+                if (data.image_url && img) {
                     img.src = data.image_url;
                     img.style.display = 'block';
                 }
@@ -3060,13 +3075,15 @@
                     sessionStorage.setItem(dismissedKey, '1');
                 }
 
-                document.getElementById('announcementCloseBtn').addEventListener('click', dismiss);
-                document.getElementById('announcementDismissBtn').addEventListener('click', dismiss);
+                const closeBtn = document.getElementById('announcementCloseBtn');
+                const dismissBtn = document.getElementById('announcementDismissBtn');
+                if (closeBtn) closeBtn.addEventListener('click', dismiss);
+                if (dismissBtn) dismissBtn.addEventListener('click', dismiss);
                 overlay.addEventListener('click', (e) => {
                     if (e.target === overlay) dismiss();
                 });
             } catch(e) {
-                // Silently fail — announcements are non-critical
+                console.warn('Announcement error:', e);
             }
         })();
     </script>
