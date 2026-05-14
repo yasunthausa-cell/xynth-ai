@@ -35,22 +35,25 @@ PRIMARY_MODEL = "qwen3.5-omni-plus"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
 FAST_MODEL    = "qwen3-omni-flash"
 
-RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant.
+RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant powered by live web search.
 
-STRUCTURE YOUR RESPONSE DYNAMICALLY:
-- Read the user's query and adapt your length. Simple questions = short answers.
-- Use headings (##) and emojis for complex topics.
-- ALWAYS cite sources INLINE: [Source Name](URL).
-- DO NOT use generic numbers like [1].
-- VISUAL DIAGRAMS: Use Mermaid syntax (```mermaid ... ```) to create flowcharts or diagrams for complex processes.
-- MATH: Use LaTeX for all mathematical expressions. Use $ ... $ for inline and $$ ... $$ for block math.
+CRITICAL ANTI-HALLUCINATION RULES (FOLLOW STRICTLY):
+- NEVER invent facts, statistics, dates, names, or claims. If you don't have a sourced answer, say so.
+- ONLY state information that is directly supported by the provided [WEB SEARCH RESULTS].
+- If the search results don't contain an answer, say: "I couldn't find reliable up-to-date information on this — here is what I know from my training, but please verify."
+- ALWAYS include at least one inline source citation [Source Name](URL) for factual claims.
+- The current year is 2026. Always answer with 2026-current knowledge. Do NOT give outdated information.
 
-CONCISENESS:
-- Unless 'Deep Dive' is active, be concise (2-4 paragraphs max).
-- If it's a greeting or simple fact, be very brief.
+STRUCTURE YOUR RESPONSE:
+- Short greetings/chit-chat: 1-2 sentences only. No search needed.
+- Simple factual questions: 1-3 paragraphs. Cite sources.
+- Complex research questions: Use ## headings, bullet points, and emojis. Full comprehensive answer with multiple citations.
+- ALWAYS cite sources INLINE: [Source Name](URL). DO NOT use generic numbers like [1].
+- VISUAL DIAGRAMS: Use Mermaid syntax (```mermaid ... ```) for flowcharts or processes.
+- MATH: Use LaTeX for math. Use $ ... $ inline and $$ ... $$ for block.
 
 IDENTITY:
-- You are Resynth Research by Resynth Inc. Reply in the user's language. Do not repeat introductions. """
+- You are Resynth Research by Resynth Inc. Reply in the user's language. Do not repeat introductions."""
 
 LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
 Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
@@ -719,9 +722,21 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     base_prompt = LIT_REVIEW_PROMPT if lit_review else RESEARCH_SYSTEM_PROMPT
     
     style_instr = f"\n\nCITATION STYLE: Use {citation_style.upper()} format for all citations." if citation_style != 'inline' else ""
-    verbosity_instruction = "\n\nBE EXTREMELY CONCISE: Provide a direct answer in 1-3 paragraphs. No fluff." if not deep_dive and not lit_review else "\n\nDEEP DIVE MODE: Provide an exhaustive, detailed, and comprehensive scholarly report."
     
-    dynamic_system_prompt = base_prompt + verbosity_instruction + style_instr + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}."
+    # Only force conciseness for off-topic/greeting-classified queries — not for real research
+    if deep_dive or lit_review:
+        verbosity_instruction = "\n\nDEEP DIVE MODE: Provide an exhaustive, detailed, and comprehensive scholarly report. No length limit."
+    elif not should_search:
+        # No web search = likely chit-chat or simple fact
+        verbosity_instruction = "\n\nThis is a casual/simple question. Be concise: 1-3 sentences."
+    else:
+        # Real web-searched factual question — give a thorough, honest answer
+        verbosity_instruction = "\n\nThis query required web search. Give a thorough, accurate, well-structured answer with all relevant facts. DO NOT cut short. Cover all key points from the sources."
+    
+    now = datetime.datetime.now()
+    date_context = f"\n\nCRITICAL DATE CONTEXT: Today is {now.strftime('%A, %B %d, %Y')} ({now.year}). You have access to 2026 web search results. Always prioritize and surface the MOST RECENT information available. If a source is from 2025 or 2026, prefer it over older sources. Never give outdated information without flagging it."
+    
+    dynamic_system_prompt = base_prompt + verbosity_instruction + style_instr + date_context
 
     if is_debate:
         # DEBATE LOGIC: Run two perspectives
