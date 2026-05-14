@@ -34,30 +34,34 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static_me
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 # ── Supabase (optional – gracefully disabled if keys missing) ────────────────
-_SB_URL = os.environ.get("SUPABASE_URL", "")
-_SB_KEY = os.environ.get("SUPABASE_KEY", "")
-
 try:
     from supabase import create_client as _sb_create
+    _SB_URL = os.environ.get("SUPABASE_URL", "")
+    _SB_KEY = os.environ.get("SUPABASE_KEY", "")
     _sb = _sb_create(_SB_URL, _SB_KEY) if _SB_URL and _SB_KEY else None
 except Exception as e:
     print("Supabase init error:", e)
     _sb = None
 
-
-
-def _get_user_id(token: str):
-    """Bypass supabase SDK to get user ID from token."""
+def _get_auth_client(token: str):
     if not _SB_URL or not _SB_KEY: return None
-    import requests
-    headers = {"apikey": _SB_KEY, "Authorization": f"Bearer {token}"}
     try:
-        r = requests.get(f"{_SB_URL}/auth/v1/user", headers=headers, timeout=5)
-        if r.status_code == 200:
-            return r.json().get("id")
+        from supabase import ClientOptions
+        opts = ClientOptions(headers={"Authorization": f"Bearer {token}"})
+        return _sb_create(_SB_URL, _SB_KEY, options=opts)
     except Exception:
         pass
-    return None
+    
+    client = _sb_create(_SB_URL, _SB_KEY)
+    try:
+        client.postgrest.auth(token)
+    except Exception:
+        pass
+    try:
+        client.postgrest.session.headers["Authorization"] = f"Bearer {token}"
+    except Exception:
+        pass
+    return client
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -120,81 +124,6 @@ def _chunk_for_whatsapp(text: str, limit: int = 1500):
 @app.route("/", methods=["GET"])
 def index():
     return render_template("chat.html")
-
-@app.route('/api/visualize', methods=['POST'])
-def visualize_research():
-    """Generate a Mermaid mindmap of the research content."""
-    data = request.json or {}
-    context = data.get('context', '')
-    query = data.get('query', '')
-    
-    prompt = f"""Based on this research about '{query}', create a Mermaid mindmap that visualizes the core concepts and their connections.
-    Output ONLY the Mermaid code starting with 'mindmap'.
-    Keep it concise with 3-4 main branches.
-    
-    Context: {context[:3000]}
-    """
-    try:
-        from research_runner import _get_client, FAST_MODEL
-        client, _, _ = _get_client()
-        resp = client.chat.completions.create(
-            model=FAST_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=500
-        )
-        content = resp.choices[0].message.content.strip()
-        # Clean up any markdown blocks
-        if "```mermaid" in content: content = content.split("```mermaid")[1].split("```")[0].strip()
-        elif "```" in content: content = content.split("```")[1].split("```")[0].strip()
-        return jsonify({"mermaid": content})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/project/bibtex', methods=['POST'])
-def project_bibtex():
-    """Export all sources from a project as a combined BibTeX."""
-    data = request.json or {}
-    project_id = data.get('project_id')
-    if not project_id or not _SB_URL or not _SB_KEY: return jsonify({"error": "missing"}), 400
-    
-    try:
-        # 1. Get all chat IDs in project
-        r1 = requests.get(f"{_SB_URL}/rest/v1/chats?project_id=eq.{project_id}", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
-        chat_ids = [c['id'] for c in (r1.json() or [])]
-        if not chat_ids: return jsonify({"bibtex": ""})
-        
-        # 2. Get all assistant messages with sources
-        all_bib = []
-        for cid in chat_ids:
-            r2 = requests.get(f"{_SB_URL}/rest/v1/messages?chat_id=eq.{cid}&role=eq.assistant", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
-            for msg in (r2.json() or []):
-                content = msg.get('content', '')
-                pass
-        
-        return jsonify({"bibtex": "% Project Bibliography\n@article{...}"})
-    except: return jsonify({"error": "failed"}), 500
-
-@app.route('/api/share', methods=['POST'])
-def share_report():
-    """Create a public share link for a research report."""
-    data = request.json or {}
-    content = data.get('content')
-    sources = data.get('sources')
-    if not _SB_URL or not _SB_KEY: return jsonify({"error": "No SB"}), 500
-    try:
-        r = requests.post(f"{_SB_URL}/rest/v1/shared_reports", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}","Prefer":"return=representation"}, json={"content":content,"sources":sources})
-        if r.status_code in (200,201) and r.json():
-            return jsonify({"url": f"{request.host_url}share/{r.json()[0]['id']}"})
-    except: pass
-    return jsonify({"error":"failed"}), 500
-
-@app.route('/share/<report_id>')
-def view_shared(report_id):
-    """Public view for shared research."""
-    r = requests.get(f"{_SB_URL}/rest/v1/shared_reports?id=eq.{report_id}", headers={"apikey":_SB_KEY,"Authorization":f"Bearer {_SB_KEY}"})
-    if r.status_code == 200 and r.json():
-        return render_template('shared.html', report=r.json()[0])
-    return "Not found", 404
 
 
 @app.route("/chat", methods=["GET"])
@@ -386,21 +315,6 @@ def chat():
     return jsonify({"response": _run_agent(session_id, augmented)})
 
 
-# ── In-memory session document store ─────────────────────────────────────────
-# Keeps the last uploaded document text per session so follow-up
-# questions work without re-uploading the file.
-_session_docs: dict = {}
-
-
-@app.route("/session/clear-doc", methods=["POST"])
-def clear_session_doc():
-    """Clear the stored document for a session."""
-    data = request.get_json(silent=True) or {}
-    sid = str(data.get("session_id", ""))
-    _session_docs.pop(sid, None)
-    return jsonify({"ok": True})
-
-
 @app.route("/chat/stream", methods=["GET", "POST"])
 def chat_stream():
     """Server-Sent Events stream. Supports both GET (legacy) and POST (new CF runner)."""
@@ -414,36 +328,20 @@ def chat_stream():
         image_data = data.get("image_data", None)
 
         deep_dive  = bool(data.get("deep_dive", False))
-        lit_review = bool(data.get("lit_review", False))
 
-        # Handle document attachments (PDF/TXT/DOCX) — extract text + store in session
-        if image_data and image_data.startswith("data:"):
-            mime_type = image_data.split(";")[0].split(":")[1]
-            DOC_MIMES = [
-                "application/pdf",
-                "text/plain",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ]
-            if mime_type in DOC_MIMES:
-                import base64
-                from rag_pipeline import extract_text_from_pdf, extract_text_from_txt
-                try:
-                    file_bytes = base64.b64decode(image_data.split(",")[1])
-                    doc_text = extract_text_from_pdf(file_bytes) if mime_type == "application/pdf" else extract_text_from_txt(file_bytes)
-                    if doc_text and doc_text.strip():
-                        _session_docs[session_id] = doc_text.strip()
-                except Exception as e:
-                    print("Doc parse error:", e)
-                image_data = None  # Route to text engine
-
-        auth_header = request.headers.get("Authorization", "")
         user_id = None
-        current_token = None
-        if _SB_URL:
+        auth_sb = _sb
+        if _sb:
+            auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
-                current_token = auth_header.split(" ")[1]
-                user_id = _get_user_id(current_token)
+                token = auth_header.split(" ")[1]
+                try:
+                    user_res = _sb.auth.get_user(token)
+                    if user_res and user_res.user:
+                        user_id = user_res.user.id
+                        auth_sb = _get_auth_client(token)
+                except Exception as e:
+                    print("Auth error:", e)
 
         if not message:
             return Response(
@@ -471,18 +369,20 @@ def chat_stream():
             })
 
         def generate_cf():
-            # Retrieve any stored session document to include as context
-            session_doc = _session_docs.get(session_id)
-            # Route ALL queries (text or image) to research engine for visual search
-            yield from _research.stream_research(
-                session_id=session_id, query=message,
-                jwt_token=current_token, user_id=user_id, chat_id=chat_id,
-                deep_dive=deep_dive, sb=_sb, session_doc=session_doc,
-                lit_review=lit_review, image_data=image_data,
-                citation_style=data.get('citation_style', 'inline'),
-                strategy=data.get('strategy', 'balanced'),
-                debate=data.get('debate', False)
-            )
+            # Vision queries still go through groq_runner
+            if image_data:
+                yield from _cf.stream_chat(
+                    session_id=session_id, message=message,
+                    model_name=model, sb=auth_sb, user_id=user_id,
+                    chat_id=chat_id, image_data=image_data
+                )
+            else:
+                # All text queries → research engine
+                yield from _research.stream_research(
+                    session_id=session_id, query=message,
+                    sb=auth_sb, user_id=user_id, chat_id=chat_id,
+                    deep_dive=deep_dive
+                )
 
         headers = {
             "Content-Type":    "text/event-stream",
@@ -635,97 +535,59 @@ def polar_customer_portal():
 
 @app.route("/chats", methods=["GET"])
 def get_chats():
-    try:
-        try:
-            url = _SB_URL
-            key = _SB_KEY
-        except NameError:
-            url = os.environ.get("SUPABASE_URL", "")
-            key = os.environ.get("SUPABASE_KEY", "")
-        
-        if not url or not key: return jsonify([])
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "): return jsonify([])
-        token = auth_header.split(" ")[1]
-        
-        user_id = _get_user_id(token)
-        if not user_id: return jsonify([])
-        
-        import requests
-        headers = {
-            "apikey": key,
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        url = f"{url}/rest/v1/chats?user_id=eq.{user_id}&order=created_at.desc"
-        r = requests.get(url, headers=headers)
-        if r.status_code == 200:
-            return jsonify(r.json())
-        else:
-            return jsonify({"error": "REST error", "details": r.text}), 500
-    except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
-
-@app.route("/chats/<chat_id>", methods=["GET"])
-def get_chat_messages(chat_id):
-    if not _SB_URL or not _SB_KEY: return jsonify([])
+    if not _sb: return jsonify([])
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "): return jsonify([])
     token = auth_header.split(" ")[1]
     try:
-        user_id = _get_user_id(token)
-        if not user_id: return jsonify([])
-        
-        # Direct REST to bypass RLS SDK issues
-        import requests
-        headers = {
-            "apikey": _SB_KEY,
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        # First verify ownership
-        check_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}&user_id=eq.{user_id}&select=id"
-        r_check = requests.get(check_url, headers=headers)
-        if r_check.status_code != 200 or not r_check.json():
-            return jsonify([])
-            
-        msg_url = f"{_SB_URL}/rest/v1/messages?chat_id=eq.{chat_id}&order=created_at.asc&select=role,content,created_at"
-        r_msg = requests.get(msg_url, headers=headers)
-        if r_msg.status_code == 200:
-            return jsonify(r_msg.json())
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user: return jsonify([])
+        auth_client = _get_auth_client(token)
+        res = auth_client.table("chats").select("id, title, created_at").eq("user_id", user_res.user.id).order("created_at", desc=True).execute()
+        return jsonify(res.data)
+    except Exception as e:
+        print("GET /chats error:", e)
         return jsonify([])
+
+@app.route("/chats/<chat_id>", methods=["GET"])
+def get_chat_messages(chat_id):
+    if not _sb: return jsonify([])
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "): return jsonify([])
+    token = auth_header.split(" ")[1]
+    try:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user: return jsonify([])
+        # Verify ownership
+        auth_client = _get_auth_client(token)
+        chat_res = auth_client.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        if not chat_res.data: return jsonify([])
+        
+        res = auth_client.table("messages").select("role, content, created_at").eq("chat_id", chat_id).order("created_at").execute()
+        return jsonify(res.data)
     except Exception as e:
         print("GET /chats/<id> error:", e)
         return jsonify([])
 
 @app.route("/chats/<chat_id>", methods=["DELETE"])
 def delete_chat(chat_id):
-    if not _SB_URL or not _SB_KEY: return jsonify({"ok": False}), 503
+    """Delete a chat and all its messages (ownership verified)."""
+    if not _sb: return jsonify({"ok": False}), 503
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     token = auth_header.split(" ")[1]
     try:
-        user_id = _get_user_id(token)
-        if not user_id:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user:
             return jsonify({"ok": False, "error": "Unauthorized"}), 401
-            
-        import requests
-        headers = {
-            "apikey": _SB_KEY,
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        # Verify ownership
-        check_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}&user_id=eq.{user_id}&select=id"
-        r_check = requests.get(check_url, headers=headers)
-        if r_check.status_code != 200 or not r_check.json():
+        # Verify ownership before deleting
+        auth_client = _get_auth_client(token)
+        chat_res = auth_client.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        if not chat_res.data:
             return jsonify({"ok": False, "error": "Not found"}), 404
-            
-        # Delete messages then chat
-        requests.delete(f"{_SB_URL}/rest/v1/messages?chat_id=eq.{chat_id}", headers=headers)
-        requests.delete(f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}", headers=headers)
+        auth_client.table("messages").delete().eq("chat_id", chat_id).execute()
+        auth_client.table("chats").delete().eq("id", chat_id).execute()
         return jsonify({"ok": True})
     except Exception as e:
         print("DELETE /chats/<id> error:", e)
@@ -734,7 +596,8 @@ def delete_chat(chat_id):
 @app.route("/chats/<chat_id>", methods=["PATCH"])
 @app.route("/chats/<chat_id>/title", methods=["PATCH"])
 def rename_chat(chat_id):
-    if not _SB_URL or not _SB_KEY: return jsonify({"ok": False}), 503
+    """Rename a chat (ownership verified)."""
+    if not _sb: return jsonify({"ok": False}), 503
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
@@ -744,65 +607,20 @@ def rename_chat(chat_id):
     if not new_title:
         return jsonify({"ok": False, "error": "Missing title"}), 400
     try:
-        user_id = _get_user_id(token)
-        if not user_id:
+        user_res = _sb.auth.get_user(token)
+        if not user_res or not user_res.user:
             return jsonify({"ok": False, "error": "Unauthorized"}), 401
-            
-        import requests
-        headers = {
-            "apikey": _SB_KEY,
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal"
-        }
-        check_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}&user_id=eq.{user_id}&select=id"
-        r_check = requests.get(check_url, headers=headers)
-        if r_check.status_code != 200 or not r_check.json():
+        
+        auth_client = _get_auth_client(token)
+        chat_res = auth_client.table("chats").select("id").eq("id", chat_id).eq("user_id", user_res.user.id).execute()
+        if not chat_res.data:
             return jsonify({"ok": False, "error": "Not found"}), 404
             
-        patch_url = f"{_SB_URL}/rest/v1/chats?id=eq.{chat_id}"
-        requests.patch(patch_url, headers=headers, json={"title": new_title})
+        auth_client.table("chats").update({"title": new_title}).eq("id", chat_id).execute()
         return jsonify({"ok": True})
     except Exception as e:
         print("PATCH /chats/<id> error:", e)
         return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/test_auth", methods=["GET"])
-def test_auth():
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return jsonify({"error": "No Bearer token"})
-    token = auth_header.split(" ")[1]
-    
-    diag = {"token_prefix": token[:10], "sb_exists": bool(_sb)}
-    if not _sb: return jsonify(diag)
-    
-    try:
-        user_res = _sb.auth.get_user(token)
-        diag["user_id"] = user_res.user.id if user_res and user_res.user else None
-    except Exception as e:
-        diag["get_user_error"] = str(e)
-        return jsonify(diag)
-        
-    try:
-        auth_client = _get_auth_client(token)
-        diag["auth_client_created"] = True
-        
-        # Test 1: Fetch chats
-        res = auth_client.table("chats").select("id, title").limit(5).execute()
-        diag["chats_fetched"] = len(res.data)
-        diag["chats_sample"] = res.data
-        
-        # Test 2: Try to insert a dummy chat
-        ins = auth_client.table("chats").insert({"user_id": diag["user_id"], "title": "Diag Test Chat"}).execute()
-        diag["chat_inserted"] = bool(ins.data)
-        if ins.data:
-            auth_client.table("chats").delete().eq("id", ins.data[0]["id"]).execute()
-            
-    except Exception as e:
-        diag["query_error"] = str(e)
-        
-    return jsonify(diag)
 
 @app.route("/api/generate-title", methods=["POST"])
 def generate_title():
@@ -933,9 +751,9 @@ def send_welcome_email():
                     You now have access to a research AI that searches the live web, cites every source, and thinks deeply on any topic.<br><br>
                     You start with <strong style="color:#fff">20 free messages per day</strong>. Upgrade to Pro for unlimited access.
                   </div>
-                  <a href="https://resynth-ai-production.up.railway.app" style="display:inline-block;background:#fff;color:#0a0a0f;font-weight:700;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;">Open Resynth →</a>
+                  <a href="https://xynth-ai-production.up.railway.app" style="display:inline-block;background:#fff;color:#0a0a0f;font-weight:700;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;">Open Resynth →</a>
                   <div style="margin-top:40px;padding-top:20px;border-top:1px solid #1f1f2e;color:#555566;font-size:12px;">
-                    © 2026 Resynth Inc. · <a href="https://resynth-ai-production.up.railway.app/pricing" style="color:#555566;">Upgrade to Pro</a>
+                    © 2026 Resynth Inc. · <a href="https://xynth-ai-production.up.railway.app/pricing" style="color:#555566;">Upgrade to Pro</a>
                   </div>
                 </div>
                 """

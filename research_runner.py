@@ -35,25 +35,30 @@ PRIMARY_MODEL = "qwen3.5-omni-plus"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
 FAST_MODEL    = "qwen3-omni-flash"
 
-RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant powered by live web search.
+RESEARCH_SYSTEM_PROMPT = """You are Resynth Research, an advanced AI research assistant for students and professionals.
 
-CRITICAL ANTI-HALLUCINATION RULES (FOLLOW STRICTLY):
-- NEVER invent facts, statistics, dates, names, or claims. If you don't have a sourced answer, say so.
-- ONLY state information that is directly supported by the provided [WEB SEARCH RESULTS].
-- If the search results don't contain an answer, say: "I couldn't find reliable up-to-date information on this — here is what I know from my training, but please verify."
-- ALWAYS include at least one inline source citation [Source Name](URL) for factual claims.
-- The current year is 2026. Always answer with 2026-current knowledge. Do NOT give outdated information.
+STRUCTURE YOUR RESPONSE DYNAMICALLY:
+Do NOT follow a rigid template. Instead, read the user's query and create a beautifully structured, highly readable response using custom headings (##) that make sense for that specific topic. 
+- Use bold text, bullet points, and paragraphs to make it scannable.
+- DO NOT use markdown tables unless explicitly asked. Tables are hard to read on mobile. Use bullet points instead.
+- If it's a coding question, provide clear explanations and code blocks.
+- If it's news, structure it chronologically or by theme.
+- Add relevant emojis to your headings to make it engaging.
 
-STRUCTURE YOUR RESPONSE:
-- Short greetings/chit-chat: 1-2 sentences only. No search needed.
-- Simple factual questions: 1-3 paragraphs. Cite sources.
-- Complex research questions: Use ## headings, bullet points, and emojis. Full comprehensive answer with multiple citations.
-- ALWAYS cite sources INLINE: [Source Name](URL). DO NOT use generic numbers like [1].
-- VISUAL DIAGRAMS: Use Mermaid syntax (```mermaid ... ```) for flowcharts or processes.
-- MATH: Use LaTeX for math. Use $ ... $ inline and $$ ... $$ for block.
+CITING SOURCES (CRITICAL):
+- If you were provided web search results, ALWAYS use them and cite them.
+- Cite your sources INLINE using markdown hyperlinks with the source's name. 
+  Example: "According to [Reuters](https://...), the market..." or "...grew by 50% ([Bloomberg](https://...))."
+- DO NOT use generic numbers like [1] or [2] for citations. Use the actual name/title of the source as the clickable link text.
+- NEVER output a "References", "Sources", or "Citations" list at the end of your response. The UI will automatically generate a hidden dropdown for this.
 
-IDENTITY:
-- You are Resynth Research by Resynth Inc. Reply in the user's language. Do not repeat introductions."""
+LANGUAGE:
+- ALWAYS reply in the exact same language that the user typed their prompt in. If they ask in Spanish, reply in Spanish. If in French, reply in French.
+
+IDENTITY (CRITICAL):
+- If the user asks who created you, what you are, or your origin, state clearly and concisely that you are Resynth Research, an AI assistant developed by **Resynth Inc.** Do not hallucinate or create fictional architectures, weights, or complex origin stories. Keep it simple and truthful.
+
+Be academically rigorous, precise, and highly readable."""
 
 LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
 Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
@@ -73,13 +78,12 @@ If the user's query contains typos, misspellings, or bad grammar, automatically 
 Return ONLY a JSON array of 3 strings. Example: ["sub-query 1", "sub-query 2", "sub-query 3"]
 Query: """
 
-CLASSIFY_PROMPT = """You are a research tool classifier. Decide how to handle this query.
+CLASSIFY_PROMPT = """You are a research tool classifier. Decide if this query is a legitimate research/learning/coding topic.
 
-RESEARCH: Complex topics, academic subjects, coding, news, or any topic requiring a multi-source synthesis.
-GREETING: "hi", "hello", "good morning", "how are you".
-GENERAL: Simple facts, quick definitions, math, or direct questions that can be answered in 1-2 sentences without web research.
+ALLOWED: Science, history, technology, medicine, law, economics, society, news, coding, programming, math, engineering, academic subjects, how-to learn something, current events, analysis of any topic, debugging help, code explanation.
+NOT ALLOWED: Personal chit-chat ("how are you", "tell me a joke"), purely creative requests with no educational value ("write me a love poem"), or requests that are harmful.
 
-Reply with ONLY one word: RESEARCH, GREETING, or GENERAL.
+Reply with ONLY one word: RESEARCH or OFFTOPIC
 Query: """
 
 OFF_TOPIC_RESPONSES = [
@@ -90,25 +94,6 @@ OFF_TOPIC_RESPONSES = [
 
 import random
 import re as _re
-
-FACT_CHECK_PROMPT = """You are a meticulous Research Auditor. 
-Your task is to review the following research report against the provided raw source data.
-
-CHECK FOR:
-1. HALLUCINATIONS: Are there any claims in the report that are NOT supported by the sources?
-2. MISCITATIONS: Does the text cite Source A but the information actually came from Source B (or nowhere)?
-3. CONTRADICTIONS: Are there areas where the sources disagree, but the report ignored the conflict?
-
-Return a JSON object with:
-{
-  "status": "VERIFIED" or "CLARIFIED",
-  "notes": "A brief summary of your verification (e.g., 'All 12 claims verified' or 'Found minor contradiction regarding X').",
-  "corrections": "Any specific sentences that should be updated."
-}
-
-Report to Audit: {report}
-Sources: {sources}
-"""
 
 _conversations: dict = {}
 
@@ -517,41 +502,35 @@ def _format_sources(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _is_research_query(query: str, history: list) -> str:
-    """Classify the user's intent."""
+def _ai_reject(query: str) -> str:
+    """Use AI to craft a personalized, polite rejection referencing the specific query."""
     client, _, fast = _get_client()
-    if not client: return "RESEARCH"
+    if not client:
+        return "I'm Resynth Research, focused on research and learning. Try asking me about science, technology, current events, or any topic you'd like to explore!"
     try:
         resp = client.chat.completions.create(
             model=fast,
-            messages=[{"role": "user", "content": CLASSIFY_PROMPT + query}],
-            max_tokens=10
-        )
-        return resp.choices[0].message.content.strip().upper()
-    except: return "RESEARCH"
-
-def _ai_simple_reply(query: str, mode: str) -> str:
-    """Fast, concise reply for greetings or simple facts."""
-    client, _, fast = _get_client()
-    if not client: return "Hello! How can I help with your research today?"
-    
-    system = "You are Resynth Research. Be extremely concise."
-    if mode == "GREETING":
-        system += " Respond with a warm, short greeting and ask how you can help with research."
-    else:
-        system += " Provide a direct, factual answer in 1-2 sentences. No fluff."
-        
-    try:
-        resp = client.chat.completions.create(
-            model=fast,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": query}],
-            max_tokens=150
+            messages=[
+                {"role": "system", "content": (
+                    "You are Resynth Research, a focused AI research assistant for students and professionals. "
+                    "The user asked something that isn't a research or learning topic. "
+                    "Write a SHORT, friendly, personalized reply (2-3 sentences max) that: "
+                    "1) Acknowledges what they specifically asked, "
+                    "2) Explains you're focused on research/learning topics, "
+                    "3) Suggests they try a research question instead. "
+                    "Be warm but clear. Don't be robotic."
+                )},
+                {"role": "user", "content": query}
+            ],
+            max_tokens=120,
+            temperature=0.8,
         )
         return resp.choices[0].message.content.strip()
-    except: return "I'm here to help with your research. What would you like to explore?"
+    except Exception:
+        return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, image_data=None, **kwargs):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -560,56 +539,21 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
 
     history = _conversations.get(session_id, [])
 
-    # ── Step 0: Visual Research (Vision Analysis) ──────────────────────────
-    vision_context = ""
-    if image_data:
-        yield f'data: {json.dumps({"type": "status", "id": "vision", "text": "👁️ Analyzing your image for research context..."})}\n\n'
-        try:
-            # Use Qwen-VL or similar via Dashscope
-            resp = client.chat.completions.create(
-                model="qwen-vl-plus",
-                messages=[
-                    {"role": "user", "content": [
-                        {"type": "text", "text": "Describe this image in detail for a research assistant. Identify any charts, text, or objects that might be relevant for a web search."},
-                        {"type": "image_url", "image_url": {"url": image_data if image_data.startswith("http") else f"data:image/jpeg;base64,{image_data}"}}
-                    ]}
-                ],
-                max_tokens=300
-            )
-            vision_context = f"\n\n[IMAGE ANALYSIS]: {resp.choices[0].message.content}\n"
-            query = f"{query}\n(Visual Context: {vision_context})"
-        except Exception as e:
-            print("Vision error:", e)
-
-    # ── Detect and fetch URLs or ArXiv IDs embedded in the query ──────────────────
+    # ── Detect and fetch URLs embedded in the query ───────────────────────────────
     urls_in_query = URL_PATTERN.findall(query)
-    # Also detect plain ArXiv IDs like 2401.00001
-    arxiv_ids = _re.findall(r'\b\d{4}\.\d{4,5}(?:v\d+)?\b', query)
-    
     fetched_url_context = ""
-    if urls_in_query or arxiv_ids:
-        status_msg = "\U0001f517 Fetching linked academic source(s)..."
-        yield f'data: {json.dumps({"type": "status", "id": "urls", "text": status_msg})}\n\n'
-        
-        # Handle plain ArXiv IDs by turning them into URLs
-        for aid in arxiv_ids[:2]:
-            urls_in_query.append(f"https://arxiv.org/abs/{aid}")
-
-        for u in list(dict.fromkeys(urls_in_query))[:3]:  # dedupe + cap at 3
+    if urls_in_query:
+        yield f"data: {json.dumps({'type': 'status', 'id': 'urls', 'text': f'\ud83d\udd17 Fetching {len(urls_in_query)} linked source(s)...'})}\n\n"
+       for u in urls_in_query[:3]:  # cap at 3 URLs
             content = _fetch_url_content(u)
             if content and not content.startswith("[Could not"):
-                fetched_url_context += f"\n\n[FETCHED SOURCE: {u}]\n{content}"
+                fetched_url_context += f"\n\n[FETCHED URL: {u}]\n{content}"
 
-    # ── Guard: Intent Detection ──────────────────────────────────────────────
-    intent = _is_research_query(query, history)
-    if intent in ("GREETING", "GENERAL"):
-        msg = _ai_simple_reply(query, intent)
-        # Avoid repetition
-        if history and history[-1]['content'].strip() == msg.strip():
-            msg = "How else can I assist your research today?"
-            
+    # ── Guard: reject off-topic — AI crafts personalized reply ───────────────
+    if not _is_research_query(query, history):
+        yield f"data: {json.dumps({'type': 'status', 'text': '🤔 Thinking...'})}\n\n"
+        msg = _ai_reject(query)
         yield f"data: {json.dumps({'type': 'token', 'text': msg})}\n\n"
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
         
         # Save to Supabase even if off-topic
         if jwt_token and user_id:
@@ -670,14 +614,12 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
             # Force more academic sub-queries
             sub_queries = [q + " literature review papers" for q in sub_queries]
             
-        search_msg = f"🔍 Searching {len(sub_queries)} angles in parallel..."
-        yield f'data: {json.dumps({"type": "status", "id": "search", "text": search_msg})}\n\n'
+        yield f"data: {json.dumps({'type': 'status', 'id': 'search', 'text': f'🔍 Searching {len(sub_queries)} angles in parallel...'})}\n\n"
 
         # Step 2: Parallel search
         results = _parallel_search(sub_queries)
         yield f"data: {json.dumps({'type': 'sources', 'sources': results})}\n\n"
-        sources_msg = f"📖 Found {len(results)} sources. Extracting key insights..."
-        yield f'data: {json.dumps({"type": "status", "id": "sources", "text": sources_msg})}\n\n'
+        yield f"data: {json.dumps({'type': 'status', 'id': 'sources', 'text': f'📖 Found {len(results)} sources. Extracting key insights...'})}\n\n"
     else:
         yield f"data: {json.dumps({'type': 'status', 'id': 'plan', 'text': '🧠 Answering from knowledge base...'})}\n\n"
 
@@ -689,8 +631,7 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
             chunks = retrieve_relevant_chunks(query, user_id, sb)
             if chunks:
                 rag_context = "\n\n[USER DOCUMENTS — RAG]\n" + "\n---\n".join(chunks)
-                rag_msg = '📁 Cross-referencing your personal document library...'
-                yield f'data: {json.dumps({"type": "status", "id": "rag", "text": rag_msg})}\n\n'
+                yield f"data: {json.dumps({'type': 'status', 'id': 'rag', 'text': '📁 Cross-referencing your personal document library...'})}\n\n"
         except Exception as e:
             print("RAG retrieve error:", e)
 
@@ -698,14 +639,9 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     session_doc_context = ""
     if session_doc:
         session_doc_context = f"\n\n[ATTACHED DOCUMENT — USER UPLOADED THIS SESSION]\n{session_doc[:12000]}"
-        doc_msg = '📎 Analyzing your attached paper...'
-        yield f'data: {json.dumps({"type": "status", "id": "doc", "text": doc_msg})}\n\n'
+        yield f"data: {json.dumps({'type': 'status', 'id': 'doc', 'text': '📎 Analyzing your attached paper...'})}\n\n"
 
-    # Step 4: Synthesis ──────────────────────────────────────────────────
-    citation_style = kwargs.get('citation_style', 'inline')
-    strategy = kwargs.get('strategy', 'balanced')
-    is_debate = kwargs.get('debate', False)
-
+    # Step 4: Build prompt and stream report
     source_text = _format_sources(results)
     augmented = (
         (f"[WEB SEARCH RESULTS — {datetime.date.today()}]\n{source_text}\n\n" if source_text.strip() else "")
@@ -715,44 +651,10 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         + f"\n\nResearch query: {query}"
     )
 
-    synth_msg = '🧠 Synthesizing comprehensive research report...' if not lit_review else '📚 Synthesizing formal literature review...'
-    if is_debate: synth_msg = '⚔️ Engaging Multi-Agent Debate Mode...'
-    yield f"data: {json.dumps({'type': 'status', 'id': 'synth', 'text': synth_msg})}\n\n"
+    yield f"data: {json.dumps({'type': 'status', 'id': 'synth', 'text': '🧠 Synthesizing comprehensive research report...' if not lit_review else '📚 Synthesizing formal literature review...'})}\n\n"
 
     base_prompt = LIT_REVIEW_PROMPT if lit_review else RESEARCH_SYSTEM_PROMPT
-    
-    style_instr = f"\n\nCITATION STYLE: Use {citation_style.upper()} format for all citations." if citation_style != 'inline' else ""
-    
-    # Only force conciseness for off-topic/greeting-classified queries — not for real research
-    if deep_dive or lit_review:
-        verbosity_instruction = "\n\nDEEP DIVE MODE: Provide an exhaustive, detailed, and comprehensive scholarly report. No length limit."
-    elif not should_search:
-        # No web search = likely chit-chat or simple fact
-        verbosity_instruction = "\n\nThis is a casual/simple question. Be concise: 1-3 sentences."
-    else:
-        # Real web-searched factual question — give a thorough, honest answer
-        verbosity_instruction = "\n\nThis query required web search. Give a thorough, accurate, well-structured answer with all relevant facts. DO NOT cut short. Cover all key points from the sources."
-    
-    now = datetime.datetime.now()
-    date_context = f"\n\nCRITICAL DATE CONTEXT: Today is {now.strftime('%A, %B %d, %Y')} ({now.year}). You have access to 2026 web search results. Always prioritize and surface the MOST RECENT information available. If a source is from 2025 or 2026, prefer it over older sources. Never give outdated information without flagging it."
-    
-    dynamic_system_prompt = base_prompt + verbosity_instruction + style_instr + date_context
-
-    if is_debate:
-        # DEBATE LOGIC: Run two perspectives
-        perspectives = ["PRO/SUPPORTIVE Perspective", "CON/CRITICAL Perspective"]
-        for p in perspectives:
-            debate_header = f"\n\n### {p}\n"
-            yield f"data: {json.dumps({'type': 'token', 'text': debate_header})}\n\n"
-            p_prompt = dynamic_system_prompt + f"\n\nYou are representing the {p}. Focus on arguments and evidence supporting this specific side."
-            messages = [{"role": "system", "content": p_prompt}, {"role": "user", "content": augmented}]
-            
-            stream = client.chat.completions.create(model=primary_model, messages=messages, max_tokens=2000, stream=True)
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield f"data: {json.dumps({'type': 'token', 'text': chunk.choices[0].delta.content})}\n\n"
-        return
-
+    dynamic_system_prompt = base_prompt + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
     messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
     messages.append({"role": "user", "content": augmented})
@@ -776,21 +678,6 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     except Exception as exc:
         yield f"data: {json.dumps({'type': 'error', 'text': repr(exc)})}\n\n"
         return
-
-    # ── Step 4: Fact-Check & Verification ───────────────────────────────────
-    if results and len(full_response) > 200:
-        yield f'data: {json.dumps({"type": "status", "id": "verify", "text": "🛡️ Cross-verifying claims with source data..."})}\n\n'
-        try:
-            audit_prompt = FACT_CHECK_PROMPT.format(report=full_response[:4000], sources=source_text[:6000])
-            audit_resp = client.chat.completions.create(
-                model=FAST_MODEL,
-                messages=[{"role": "user", "content": audit_prompt}],
-                response_format={"type": "json_object"},
-                max_tokens=300
-            )
-            audit_data = json.loads(audit_resp.choices[0].message.content)
-            yield f"data: {json.dumps({'type': 'verification', 'data': audit_data})}\n\n"
-        except: pass
 
     # Persist history (store plain query, not augmented)
     entry = _conversations.setdefault(session_id, [])
@@ -835,40 +722,15 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
                 yield f"data: {json.dumps({'type': 'error', 'text': f'Save error: {str(e)}'})}\n\n"
 
     # ── Step 5: Image search (if requested or visual topic) ──────────────────
-    # ── Step 5: Summary & BibTeX ─────────────────────────────────────────────
-    bibtex_data = ""
-    if results:
-        bibtex_parts = []
-        for i, res in enumerate(results[:10]):
-            safe_title = re.sub(r'[^a-zA-Z0-9]', '', res.get('title', 'paper')[:20])
-            bib = f"@article{{resynth_{i}_{safe_title},\n  title={{{res.get('title', 'Unknown Title')}}},\n  author={{Resynth Research Assistant}},\n  url={{{res.get('url', '')}}},\n  journal={{Web Source}},\n  year={{{datetime.now().year}}}\n}}"
-            bibtex_parts.append(bib)
-        bibtex_data = "\n\n".join(bibtex_parts)
-        yield f"data: {json.dumps({'type': 'bibtex', 'bibtex': bibtex_data})}\n\n"
-
-    if deep_dive:
-        summary_prompt = f"Summarize the following research in exactly 3 bullet points as an 'Executive Summary':\n\n{full_response[:4000]}"
-        try:
-            sum_resp = client.chat.completions.create(
-                model=FAST_MODEL,
-                messages=[{"role": "user", "content": summary_prompt}],
-                max_tokens=200
-            )
-            summary_text = sum_resp.choices[0].message.content.strip()
-            yield f"data: {json.dumps({'type': 'summary', 'text': summary_text})}\n\n"
-        except: pass
-
     if _wants_images(query):
-        img_status = '🖼️ Fetching relevant images...'
-        yield f'data: {json.dumps({"type": "status", "text": img_status})}\n\n'
+        yield f"data: {json.dumps({'type': 'status', 'text': '🖼️ Fetching relevant images...'})}\n\n"
         images = _search_images(query, max_images=4)
         if images:
             yield f"data: {json.dumps({'type': 'images', 'images': images})}\n\n"
 
     # ── Step 6: PDF generation (if requested) ────────────────────────────────
     if _wants_pdf(query):
-        pdf_status = '📄 Generating PDF report...'
-        yield f'data: {json.dumps({"type": "status", "text": pdf_status})}\n\n'
+        yield f"data: {json.dumps({'type': 'status', 'text': '📄 Generating PDF report...'})}\n\n"
         try:
             from pdf_utils import generate_research_pdf
             pdf_url = generate_research_pdf(
@@ -880,23 +742,5 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
                 yield f"data: {json.dumps({'type': 'pdf', 'url': pdf_url, 'title': query[:60]})}\n\n"
         except Exception as e:
             print("PDF error:", e)
-
-    # ── Step 7: Related Questions ──────────────────────────────────────────
-    try:
-        followup_prompt = f"Based on this research report about '{query}', suggest 3 concise follow-up research questions that a user might want to ask next. Return ONLY a JSON array of 3 strings. Example: [\"question 1\", \"question 2\", \"question 3\"]"
-        resp = client.chat.completions.create(
-            model=FAST_MODEL,
-            messages=[{"role": "system", "content": "You are a research assistant. Output ONLY valid JSON array."}, 
-                      {"role": "user", "content": followup_prompt}],
-            max_tokens=150,
-            temperature=0.7,
-        )
-        import re
-        match = re.search(r'\[.*\]', resp.choices[0].message.content.strip(), re.DOTALL)
-        if match:
-            followups = json.loads(match.group(0))
-            yield f"data: {json.dumps({'type': 'followups', 'questions': followups})}\n\n"
-    except Exception as e:
-        print("Follow-up error:", e)
 
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
