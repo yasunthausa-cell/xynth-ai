@@ -1689,24 +1689,7 @@
                 <h1 class="hero-headline"><span id="greetingText">Good Morning.</span><br><span class="grad">How can I help today?</span></h1>
             </div>
             
-            <div id="suggestions" class="suggestions">
-                <div class="suggestion-chip" onclick="setPrompt('Analyze the current state of the global economy in 2024')">
-                    <strong>Global Economy 2024</strong>
-                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Deep research on trends, inflation, and growth.</div>
-                </div>
-                <div class="suggestion-chip" onclick="setPrompt('How does CRISPR-Cas9 technology work in gene editing?')">
-                    <strong>CRISPR Technology</strong>
-                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Technical breakdown of molecular mechanisms.</div>
-                </div>
-                <div class="suggestion-chip" onclick="setPrompt('What are the key differences between SQL and NoSQL databases?')">
-                    <strong>SQL vs NoSQL</strong>
-                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Architecture, scaling, and use-case analysis.</div>
-                </div>
-                <div class="suggestion-chip" onclick="setPrompt('Explain the concept of quantum entanglement for beginners')">
-                    <strong>Quantum Entanglement</strong>
-                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Simplified conceptual guide to particle physics.</div>
-                </div>
-            </div>
+
 
             <div id="messagesContainer" class="messages-container"></div>
         </div>
@@ -2143,8 +2126,6 @@
                     updateGreeting();
                     chatView.classList.remove('has-messages');
                     document.getElementById('landingGreeting').style.display = 'flex';
-                    const suggestions = document.getElementById('suggestions');
-                    if (suggestions) suggestions.style.display = 'flex';
                     if (window.innerWidth <= 768) {
                         document.getElementById('topNav').classList.add('hidden-mobile');
                     }
@@ -2452,7 +2433,6 @@
             if (btnElement) btnElement.classList.add('active');
             
             document.getElementById('landingGreeting').style.display = 'none';
-            document.getElementById('suggestions').style.display = 'none';
             messagesContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); margin-top:40px;">Loading...</div>';
             if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
 
@@ -2719,8 +2699,6 @@
             showGuestToast();
             
             document.getElementById('landingGreeting').style.display = 'none';
-            const suggestions = document.getElementById('suggestions');
-            if (suggestions) suggestions.style.display = 'none';
             chatView.classList.add('has-messages');
             
             // Show nav on mobile when conversation starts
@@ -3038,7 +3016,7 @@
                     if (fullText) botBubble.querySelector('.markdown-body').innerHTML = marked.parse(fullText);
                 } else {
                     console.error(err);
-                    botBubble.querySelector('.markdown-body').innerHTML = `<span style="color:#ef4444">Connection failed. Please try again.</span>`;
+                    botBubble.querySelector('.markdown-body').innerHTML += `<br><br><span style="color:#ef4444">Connection failed. Please try again.</span>`;
                 }
             }
             stopGenerationUI();

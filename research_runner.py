@@ -831,7 +831,7 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         bibtex_data = "\n\n".join(bibtex_parts)
         yield f"data: {json.dumps({'type': 'bibtex', 'bibtex': bibtex_data})}\n\n"
 
-    if is_deep_dive:
+    if deep_dive:
         summary_prompt = f"Summarize the following research in exactly 3 bullet points as an 'Executive Summary':\n\n{full_response[:4000]}"
         try:
             sum_resp = client.chat.completions.create(
