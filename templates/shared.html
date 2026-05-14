@@ -47,17 +47,23 @@
         });
 
         if (report.sources) {
-            const sources = JSON.parse(report.sources);
+            let sources = [];
+            try {
+                sources = typeof report.sources === 'string' ? JSON.parse(report.sources) : report.sources;
+            } catch(e) { console.error('Sources parse error:', e); }
+            
             const sourcesEl = document.getElementById('sources');
-            sourcesEl.innerHTML = '<h3>Sources</h3>';
-            sources.forEach((s, i) => {
-                const a = document.createElement('a');
-                a.className = 'source-link';
-                a.href = s.url;
-                a.target = '_blank';
-                a.innerText = `[${i+1}] ${s.title}`;
-                sourcesEl.appendChild(a);
-            });
+            if (sourcesEl && Array.isArray(sources)) {
+                sourcesEl.innerHTML = '<h3>Sources</h3>';
+                sources.forEach((s, i) => {
+                    const a = document.createElement('a');
+                    a.className = 'source-link';
+                    a.href = s.url;
+                    a.target = '_blank';
+                    a.innerText = `[${i+1}] ${s.title}`;
+                    sourcesEl.appendChild(a);
+                });
+            }
         }
     </script>
 </body>

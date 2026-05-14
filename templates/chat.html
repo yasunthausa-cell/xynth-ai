@@ -19,7 +19,15 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js"></script>
-    <script src="/static/voice.js"></script>
+    <!-- voice.js removed: file not found -->
+    <script>
+        // Force service worker update: unregister old SW caching '/' and re-register new one
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+                regs.forEach(reg => reg.update());
+            });
+        }
+    </script>
     <!-- Syntax highlighting -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
@@ -103,12 +111,12 @@
             inset: 0;
             background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(5px);
-            display: flex;
+            display: none !important;
             align-items: center;
             justify-content: center;
             z-index: 1000;
         }
-        .modal-overlay.hidden { display: none; }
+        .modal-overlay:not(.hidden) { display: flex !important; }
         .modal {
             background: var(--surface);
             padding: 32px;
@@ -348,17 +356,16 @@
             inset: 0;
             background: rgba(0,0,0,0.75);
             backdrop-filter: blur(6px);
-            display: flex;
+            display: none !important;
             align-items: center;
             justify-content: center;
             z-index: 2000;
             opacity: 0;
             transition: opacity 0.3s;
-            pointer-events: none;
         }
         .announcement-overlay.show {
+            display: flex !important;
             opacity: 1;
-            pointer-events: auto;
         }
         .announcement-card {
             background: var(--surface);
@@ -1193,12 +1200,13 @@
             background: var(--surface);
             border-top: 1px solid var(--border);
             padding: 14px 24px;
-            display: flex; align-items: center; justify-content: space-between;
+            display: none; /* Changed from flex */
+            align-items: center; justify-content: space-between;
             gap: 16px; z-index: 9999; font-size: 13px;
             color: var(--text-secondary);
             transform: translateY(100%); transition: transform 0.3s ease;
         }
-        .cookie-banner.visible { transform: translateY(0); }
+        .cookie-banner.visible { display: flex; transform: translateY(0); }
         .cookie-banner a { color: var(--accent); text-decoration: none; }
         .cookie-banner-btns { display: flex; gap: 8px; flex-shrink: 0; }
         .cookie-accept-btn {
@@ -1274,17 +1282,57 @@
         }
         .settings-select {
             width: 100%;
-            background: rgba(0,0,0,0.2) !important;
+            background: rgba(0,0,0,0.2) url('data:image/svg+xml;utf8,<svg fill="none" stroke="%23888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 12px center !important;
+            background-size: 14px !important;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
             border: 1px solid rgba(255,255,255,0.08) !important;
             color: var(--text-primary) !important;
-            padding: 10px 12px !important;
+            padding: 10px 32px 10px 12px !important;
             border-radius: 10px !important;
             font-size: 12px !important;
             margin-bottom: 12px;
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
         }
-        .settings-select:focus { border-color: var(--accent) !important; outline: none; }
+        .settings-select:hover { border-color: rgba(255,255,255,0.2) !important; background-color: rgba(0,0,0,0.3) !important; }
+        .settings-select:focus { border-color: var(--accent) !important; outline: none; box-shadow: 0 0 0 2px rgba(16,185,129,0.15) !important; }
+        .settings-select option { background-color: #1a1d24; color: #fff; }
+        
+        .custom-checkbox {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            background: rgba(0,0,0,0.2);
+            cursor: pointer;
+            position: relative;
+            transition: 0.2s ease;
+            flex-shrink: 0;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .custom-checkbox:hover { border-color: rgba(255,255,255,0.3); }
+        .custom-checkbox:checked {
+            background: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 8px rgba(16,185,129,0.3);
+        }
+        .custom-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 5px;
+            width: 4px;
+            height: 8px;
+            border: solid #000;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
         .spinner { animation: spin 1s linear infinite; margin-left:8px; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
@@ -1585,7 +1633,7 @@
             </div>
 
             <div style="display:flex;align-items:center;gap:10px;font-size:11px;opacity:0.9;padding:4px 0;">
-                <input type="checkbox" id="debateMode" style="accent-color:var(--accent);width:14px;height:14px;">
+                <input type="checkbox" id="debateMode" class="custom-checkbox">
                 <label for="debateMode" style="cursor:pointer;font-weight:500;">Multi-Agent Debate</label>
             </div>
             
@@ -1636,10 +1684,30 @@
             Scroll to bottom
         </button>
 
-        <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column; height: 100%;">
-            <div id="landingGreeting" style="flex: 1; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; touch-action: none;">
+        <div id="chatView" class="chat-view active" style="display: flex; flex-direction: column;">
+            <div id="landingGreeting" class="landing-view" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; touch-action: none;">
                 <h1 class="hero-headline"><span id="greetingText">Good Morning.</span><br><span class="grad">How can I help today?</span></h1>
             </div>
+            
+            <div id="suggestions" class="suggestions">
+                <div class="suggestion-chip" onclick="setPrompt('Analyze the current state of the global economy in 2024')">
+                    <strong>Global Economy 2024</strong>
+                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Deep research on trends, inflation, and growth.</div>
+                </div>
+                <div class="suggestion-chip" onclick="setPrompt('How does CRISPR-Cas9 technology work in gene editing?')">
+                    <strong>CRISPR Technology</strong>
+                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Technical breakdown of molecular mechanisms.</div>
+                </div>
+                <div class="suggestion-chip" onclick="setPrompt('What are the key differences between SQL and NoSQL databases?')">
+                    <strong>SQL vs NoSQL</strong>
+                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Architecture, scaling, and use-case analysis.</div>
+                </div>
+                <div class="suggestion-chip" onclick="setPrompt('Explain the concept of quantum entanglement for beginners')">
+                    <strong>Quantum Entanglement</strong>
+                    <div style="font-size:11px;opacity:0.7;margin-top:4px;">Simplified conceptual guide to particle physics.</div>
+                </div>
+            </div>
+
             <div id="messagesContainer" class="messages-container"></div>
         </div>
 
@@ -1735,7 +1803,6 @@
                 currentUser = session.user;
                 currentToken = session.access_token;
                 authModal.classList.add('hidden');
-                document.getElementById('userProfile').style.display = 'none';
                 document.getElementById('userProfile').style.display = 'none';
                 logoutBtn.style.display = 'block';
                 document.getElementById('accountBtn').style.display = 'block';
@@ -2047,7 +2114,9 @@
             messagesContainer.innerHTML = '';
             chatView.classList.remove('has-messages');
             updateGreeting(); // Update greeting text
-            document.getElementById('landingGreeting').style.display = 'block';
+            document.getElementById('landingGreeting').style.display = 'flex';
+            const suggestions = document.getElementById('suggestions');
+            if (suggestions) suggestions.style.display = 'flex';
             
             // Hide nav on mobile for new chat
             if (window.innerWidth <= 768) {
@@ -2074,6 +2143,8 @@
                     updateGreeting();
                     chatView.classList.remove('has-messages');
                     document.getElementById('landingGreeting').style.display = 'flex';
+                    const suggestions = document.getElementById('suggestions');
+                    if (suggestions) suggestions.style.display = 'flex';
                     if (window.innerWidth <= 768) {
                         document.getElementById('topNav').classList.add('hidden-mobile');
                     }
@@ -2307,7 +2378,7 @@
                         currentChatId = '';
                         messagesContainer.innerHTML = '';
                         document.getElementById('suggestions').style.display = 'flex';
-                        document.getElementById('landingGreeting').style.display = 'block';
+                        document.getElementById('landingGreeting').style.display = 'flex';
                     }
                     renderChatHistory();
                 } catch(err) { console.error(err); }
@@ -2380,6 +2451,7 @@
             document.querySelectorAll('.history-item').forEach(b => b.classList.remove('active'));
             if (btnElement) btnElement.classList.add('active');
             
+            document.getElementById('landingGreeting').style.display = 'none';
             document.getElementById('suggestions').style.display = 'none';
             messagesContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); margin-top:40px;">Loading...</div>';
             if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
@@ -2593,7 +2665,7 @@
                             Resynth can make mistakes. Confirm before using or researching.<br>
                             &copy; 2026 Resynth Inc.
                         </div>
-                        <script>setTimeout(()=>{window.print(); window.close();}, 500);<\/script>
+                        \<script>setTimeout(()=>{window.print(); window.close();}, 500);<\/script>
                         </body></html>
                     `);
                     printWindow.document.close();
@@ -2632,6 +2704,13 @@
             sendBtn.disabled = messageInput.value.trim() === '';
         }
 
+        function setPrompt(text) {
+            messageInput.value = text;
+            messageInput.style.height = 'auto';
+            messageInput.style.height = messageInput.scrollHeight + 'px';
+            send();
+        }
+
         async function send() {
             const text = messageInput.value.trim();
             if (!text) return;
@@ -2640,6 +2719,8 @@
             showGuestToast();
             
             document.getElementById('landingGreeting').style.display = 'none';
+            const suggestions = document.getElementById('suggestions');
+            if (suggestions) suggestions.style.display = 'none';
             chatView.classList.add('has-messages');
             
             // Show nav on mobile when conversation starts
@@ -2884,8 +2965,8 @@
                                     }
                                     
                                     if (botBubble.dataset.sources) {
-                                    // Append collapsible sources section
-                                    try {
+                                        // Append collapsible sources section
+                                        try {
                                         const sources = JSON.parse(botBubble.dataset.sources);
                                         if (sources.length) {
                                             const sid = 'src_' + Date.now();
@@ -2944,6 +3025,7 @@
                                         }
                                     } catch(e) { console.error("Source render error", e); }
                                 }
+                            }
                             } catch (e) {
                                 console.error("JSON parse error on SSE chunk", e, dataStr);
                             }
