@@ -532,7 +532,7 @@ def _ai_reject(query: str) -> str:
         return "Hello! I'm here to help with deep research and current events for 2026. What would you like to explore?"
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, citation_style="inline", strategy="balanced", debate=False):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, citation_style="inline", strategy="balanced", debate=False, image_data=None):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -673,7 +673,18 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
 
     messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
-    messages.append({"role": "user", "content": augmented})
+    
+    if image_data:
+        primary_model = "qwen2.5-vl-72b-instruct" # Switch to vision model
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": augmented},
+                {"type": "image_url", "image_url": {"url": image_data}}
+            ]
+        })
+    else:
+        messages.append({"role": "user", "content": augmented})
 
     full_response = ""
     try:

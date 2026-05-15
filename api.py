@@ -136,6 +136,16 @@ def home():
     return render_template("chat.html")
 
 
+@app.route("/terms", methods=["GET"])
+def terms():
+    return render_template("terms.html")
+
+
+@app.route("/privacy", methods=["GET"])
+def privacy():
+    return render_template("privacy.html")
+
+
 @app.route("/build", methods=["GET"])
 def builder_page():
     """Serve the app builder UI."""
@@ -187,6 +197,7 @@ def research_stream():
     citation_style = body.get("citation_style", "inline")
     strategy = body.get("strategy", "balanced")
     debate = bool(body.get("debate", False))
+    image_data = body.get("image_data")
     if not query:
         return jsonify({"error": "query required"}), 400
 
@@ -202,7 +213,7 @@ def research_stream():
     gen = _research.stream_research(
         session_id, query, sb=sb, user_id=user_id, chat_id=chat_id,
         deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc,
-        citation_style=citation_style, strategy=strategy, debate=debate
+        citation_style=citation_style, strategy=strategy, debate=debate, image_data=image_data
     )
     return Response(stream_with_context(gen), content_type="text/event-stream",
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
@@ -397,7 +408,7 @@ def chat_stream():
                     session_id=session_id, query=message,
                     sb=auth_sb, user_id=user_id, chat_id=chat_id,
                     deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc,
-                    citation_style=citation_style, strategy=strategy, debate=debate
+                    citation_style=citation_style, strategy=strategy, debate=debate, image_data=image_data
                 )
 
         headers = {
