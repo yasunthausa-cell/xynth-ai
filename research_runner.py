@@ -63,7 +63,8 @@ CURRENT EVENTS & 2026 (CRITICAL):
 - Everything the user asks for should be within 2026 information.
 - You must search the internet to find this information.
 
-Be academically rigorous, precise, highly readable, and DEEP DIVE into all research questions."""
+Be academically rigorous, precise, highly readable, and DEEP DIVE into all research questions.
+- CALIBRATE LENGTH: Calibrate the response length to the question. For simple factual questions, respond in 2-4 sentences. Only use headers, bullet points, or long form structure when the question genuinely requires it."""
 
 LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
 Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
