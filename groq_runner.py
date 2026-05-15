@@ -25,7 +25,7 @@ MODELS = {
     "Resynth 1.5":       "qwen3.5-omni-plus",          # State-of-the-art multimodal model
     "Resynth 1.5 Turbo": "qwen3-omni-flash",           # Fastest lightweight model
 }
-VISION_MODEL = "qwen3.5-omni-plus"   # 3.5 Omni natively supports vision processing
+VISION_MODEL = "qwen2.5-vl-72b-instruct"   # Vision model
 
 DAILY_LIMITS = {"Resynth 1.5": 9999, "Resynth 1.5 Turbo": 9999}
 

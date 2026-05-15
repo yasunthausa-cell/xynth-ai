@@ -181,6 +181,9 @@ def research_stream():
     query      = body.get("query", "").strip()
     session_id = body.get("session_id", "anon")
     chat_id    = body.get("chat_id")
+    deep_dive  = bool(body.get("deep_dive", False))
+    lit_review = bool(body.get("lit_review", False))
+    session_doc = body.get("session_doc")
     if not query:
         return jsonify({"error": "query required"}), 400
 
@@ -193,7 +196,10 @@ def research_stream():
         except Exception:
             pass
 
-    gen = _research.stream_research(session_id, query, sb=sb, user_id=user_id, chat_id=chat_id)
+    gen = _research.stream_research(
+        session_id, query, sb=sb, user_id=user_id, chat_id=chat_id,
+        deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc
+    )
     return Response(stream_with_context(gen), content_type="text/event-stream",
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
@@ -328,6 +334,8 @@ def chat_stream():
         image_data = data.get("image_data", None)
 
         deep_dive  = bool(data.get("deep_dive", False))
+        lit_review = bool(data.get("lit_review", False))
+        session_doc = data.get("session_doc")
 
         user_id = None
         auth_sb = _sb
@@ -381,7 +389,7 @@ def chat_stream():
                 yield from _research.stream_research(
                     session_id=session_id, query=message,
                     sb=auth_sb, user_id=user_id, chat_id=chat_id,
-                    deep_dive=deep_dive
+                    deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc
                 )
 
         headers = {

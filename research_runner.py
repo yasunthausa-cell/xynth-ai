@@ -58,7 +58,12 @@ LANGUAGE:
 IDENTITY (CRITICAL):
 - If the user asks who created you, what you are, or your origin, state clearly and concisely that you are Resynth Research, an AI assistant developed by **Resynth Inc.** Do not hallucinate or create fictional architectures, weights, or complex origin stories. Keep it simple and truthful.
 
-Be academically rigorous, precise, and highly readable."""
+CURRENT EVENTS & 2026 (CRITICAL):
+- If asked about "current events" or the word "current", this means the year 2026.
+- Everything the user asks for should be within 2026 information.
+- You must search the internet to find this information.
+
+Be academically rigorous, precise, highly readable, and DEEP DIVE into all research questions."""
 
 LIT_REVIEW_PROMPT = """You are performing a formal Literature Review. 
 Your goal is to synthesize the provided research papers and web sources into a structured academic overview.
@@ -512,13 +517,9 @@ def _ai_reject(query: str) -> str:
             model=fast,
             messages=[
                 {"role": "system", "content": (
-                    "You are Resynth Research, a focused AI research assistant for students and professionals. "
-                    "The user asked something that isn't a research or learning topic. "
-                    "Write a SHORT, friendly, personalized reply (2-3 sentences max) that: "
-                    "1) Acknowledges what they specifically asked, "
-                    "2) Explains you're focused on research/learning topics, "
-                    "3) Suggests they try a research question instead. "
-                    "Be warm but clear. Don't be robotic."
+                    "You are Resynth Research. The user asked a chit-chat or casual question. "
+                    "Write a SHORT, friendly, and polite answer to their question (1-2 sentences max). "
+                    "Be very friendly and not rude. Just give short answers for chit-chats, but be warm."
                 )},
                 {"role": "user", "content": query}
             ],
@@ -527,7 +528,7 @@ def _ai_reject(query: str) -> str:
         )
         return resp.choices[0].message.content.strip()
     except Exception:
-        return "I'm built for research and learning — not quite the right tool for that! Try asking me about a topic you'd like to explore: science, history, technology, current events, coding, and more."
+        return "Hello! I'm here to help with deep research and current events for 2026. What would you like to explore?"
 
 
 def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False):
@@ -543,8 +544,9 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
     urls_in_query = URL_PATTERN.findall(query)
     fetched_url_context = ""
     if urls_in_query:
-        yield f"data: {json.dumps({'type': 'status', 'id': 'urls', 'text': f'\ud83d\udd17 Fetching {len(urls_in_query)} linked source(s)...'})}\n\n"
-       for u in urls_in_query[:3]:  # cap at 3 URLs
+        status_text = f"🔗 Fetching {len(urls_in_query)} linked source(s)..."
+        yield f"data: {json.dumps({'type': 'status', 'id': 'urls', 'text': status_text})}\n\n"
+        for u in urls_in_query[:3]:  # cap at 3 URLs
             content = _fetch_url_content(u)
             if content and not content.startswith("[Could not"):
                 fetched_url_context += f"\n\n[FETCHED URL: {u}]\n{content}"
