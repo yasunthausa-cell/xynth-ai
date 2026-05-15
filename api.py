@@ -184,6 +184,9 @@ def research_stream():
     deep_dive  = bool(body.get("deep_dive", False))
     lit_review = bool(body.get("lit_review", False))
     session_doc = body.get("session_doc")
+    citation_style = body.get("citation_style", "inline")
+    strategy = body.get("strategy", "balanced")
+    debate = bool(body.get("debate", False))
     if not query:
         return jsonify({"error": "query required"}), 400
 
@@ -198,7 +201,8 @@ def research_stream():
 
     gen = _research.stream_research(
         session_id, query, sb=sb, user_id=user_id, chat_id=chat_id,
-        deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc
+        deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc,
+        citation_style=citation_style, strategy=strategy, debate=debate
     )
     return Response(stream_with_context(gen), content_type="text/event-stream",
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
@@ -336,6 +340,9 @@ def chat_stream():
         deep_dive  = bool(data.get("deep_dive", False))
         lit_review = bool(data.get("lit_review", False))
         session_doc = data.get("session_doc")
+        citation_style = data.get("citation_style", "inline")
+        strategy = data.get("strategy", "balanced")
+        debate = bool(data.get("debate", False))
 
         user_id = None
         auth_sb = _sb
@@ -389,7 +396,8 @@ def chat_stream():
                 yield from _research.stream_research(
                     session_id=session_id, query=message,
                     sb=auth_sb, user_id=user_id, chat_id=chat_id,
-                    deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc
+                    deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc,
+                    citation_style=citation_style, strategy=strategy, debate=debate
                 )
 
         headers = {

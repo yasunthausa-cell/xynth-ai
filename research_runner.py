@@ -531,7 +531,7 @@ def _ai_reject(query: str) -> str:
         return "Hello! I'm here to help with deep research and current events for 2026. What would you like to explore?"
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, citation_style="inline", strategy="balanced", debate=False):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
@@ -615,6 +615,12 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
         if lit_review:
             # Force more academic sub-queries
             sub_queries = [q + " literature review papers" for q in sub_queries]
+        elif strategy == "scholarly":
+            sub_queries = [q + " academic peer reviewed research" for q in sub_queries]
+        elif strategy == "news":
+            sub_queries = [q + " recent news article" for q in sub_queries]
+        elif strategy == "technical":
+            sub_queries = [q + " technical documentation github" for q in sub_queries]
             
         yield f"data: {json.dumps({'type': 'status', 'id': 'search', 'text': f'🔍 Searching {len(sub_queries)} angles in parallel...'})}\n\n"
 
@@ -657,6 +663,13 @@ def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, c
 
     base_prompt = LIT_REVIEW_PROMPT if lit_review else RESEARCH_SYSTEM_PROMPT
     dynamic_system_prompt = base_prompt + f"\n\nCRITICAL CONTEXT:\nThe current date and time is {datetime.datetime.now().strftime('%A, %B %d, %Y %H:%M')}. Always assume the present year is {datetime.datetime.now().year} and ensure your answers reflect this timeline."
+    
+    if citation_style and citation_style != "inline":
+        dynamic_system_prompt += f"\n\nCITATION REQUIREMENT:\nYou MUST strictly format your citations and bibliography according to {citation_style.upper()} style instead of the default inline style."
+        
+    if debate:
+        dynamic_system_prompt += "\n\nMULTI-AGENT DEBATE MODE:\nBefore arriving at a final conclusion, simulate a rigorous multi-agent debate. Present conflicting perspectives, explore counterarguments, and explicitly weigh the evidence from different expert viewpoints."
+
     messages = [{"role": "system", "content": dynamic_system_prompt}]
     messages += history
     messages.append({"role": "user", "content": augmented})
