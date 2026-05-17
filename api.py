@@ -395,6 +395,18 @@ def chat_stream():
             })
 
         def generate_cf():
+            # Load full conversation history from DB for context memory
+            conversation_history = []
+            if chat_id and auth_sb and user_id:
+                try:
+                    hist_res = auth_sb.table("messages").select("role, content").eq("chat_id", chat_id).order("created_at").execute()
+                    if hist_res.data:
+                        for msg in hist_res.data:
+                            role = msg["role"] if msg["role"] in ("user", "assistant") else "user"
+                            conversation_history.append({"role": role, "content": msg["content"]})
+                except Exception as e:
+                    print("History load error:", e)
+
             # Vision queries still go through groq_runner
             if image_data:
                 yield from _cf.stream_chat(
@@ -408,7 +420,8 @@ def chat_stream():
                     session_id=session_id, query=message,
                     sb=auth_sb, user_id=user_id, chat_id=chat_id,
                     deep_dive=deep_dive, lit_review=lit_review, session_doc=session_doc,
-                    citation_style=citation_style, strategy=strategy, debate=debate, image_data=image_data
+                    citation_style=citation_style, strategy=strategy, debate=debate, image_data=image_data,
+                    conversation_history=conversation_history
                 )
 
         headers = {
@@ -472,92 +485,82 @@ def pricing_page():
     return render_template("pricing.html")
 
 
-POLAR_ACCESS_TOKEN = os.environ.get("POLAR_ACCESS_TOKEN", "")
-POLAR_PRO_PRODUCT_ID = os.environ.get("POLAR_PRO_PRODUCT_ID", "")
-POLAR_WEBHOOK_SECRET = os.environ.get("POLAR_WEBHOOK_SECRET", "")
-POLAR_SERVER = os.environ.get("POLAR_SERVER", "sandbox")
-POLAR_BASE = "https://sandbox-api.polar.sh" if POLAR_SERVER == "sandbox" else "https://api.polar.sh"
+DODO_API_KEY = os.environ.get("DODO_API_KEY", "")
+DODO_PRODUCT_ID = os.environ.get("DODO_PRODUCT_ID", "")
+DODO_WEBHOOK_SECRET = os.environ.get("DODO_WEBHOOK_SECRET", "")
+DODO_BASE = os.environ.get("DODO_BASE_URL", "https://test.dodopayments.com")
 
-@app.route("/polar/checkout", methods=["POST"])
-def polar_create_checkout():
-    if not POLAR_ACCESS_TOKEN or not POLAR_PRO_PRODUCT_ID:
-        return jsonify({"error": "Polar is not configured"}), 503
+@app.route("/dodo/checkout", methods=["POST"])
+def dodo_create_checkout():
+    if not DODO_API_KEY or not DODO_PRODUCT_ID:
+        return jsonify({"error": "Dodo Payments is not configured"}), 503
 
     data = request.get_json(silent=True) or {}
     user_id = data.get("user_id")
+    email = data.get("email", "")
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
 
     payload = {
-        "products": [POLAR_PRO_PRODUCT_ID],
+        "product_id": DODO_PRODUCT_ID,
         "metadata": {"user_id": user_id, "app": "resynth-web"},
+        "success_url": os.environ.get("APP_URL", "https://resynthai.com") + "/?payment=success",
+        "cancel_url": os.environ.get("APP_URL", "https://resynthai.com") + "/pricing",
     }
+    if email:
+        payload["customer"] = {"email": email, "name": email.split("@")[0]}
     headers = {
-        "Authorization": f"Bearer {POLAR_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {DODO_API_KEY}",
         "Content-Type": "application/json",
     }
     import requests
     try:
-        r = requests.post(f"{POLAR_BASE}/v1/checkouts/", json=payload, headers=headers, timeout=15)
+        r = requests.post(f"{DODO_BASE}/payments", json=payload, headers=headers, timeout=15)
         if r.status_code >= 400:
-            print(f"Polar checkout error {r.status_code}: {r.text}")
-            return jsonify({"error": f"Polar error: {r.text}"}), 502
-        
-        data = r.json()
-        checkout_id = data.get("id")
-        url = data.get("url")
-        if not url or not checkout_id:
-            return jsonify({"error": "Invalid Polar response"}), 502
-            
-        return jsonify({"url": url, "checkout_id": checkout_id})
+            print(f"Dodo checkout error {r.status_code}: {r.text}")
+            return jsonify({"error": f"Dodo error: {r.text}"}), 502
+        d = r.json()
+        url = d.get("payment_link") or d.get("url")
+        payment_id = d.get("id")
+        if not url:
+            return jsonify({"error": "Invalid Dodo response"}), 502
+        return jsonify({"url": url, "payment_id": payment_id})
     except Exception as e:
-        print("polar_create_checkout failed:", e)
+        print("dodo_create_checkout failed:", e)
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/polar/webhook", methods=["POST"])
-def polar_webhook():
+@app.route("/dodo/webhook", methods=["POST"])
+def dodo_webhook():
     event = request.get_json(silent=True) or {}
-    event_type = event.get("type")
-    data = event.get("data", {}) or {}
-    
+    event_type = event.get("type") or event.get("event_type", "")
+    data = event.get("data", {}) or event.get("payload", {}) or {}
+
     metadata = data.get("metadata") or {}
     user_id = metadata.get("user_id")
-    checkout_id = data.get("id") or data.get("checkout_id")
-    
-    print(f"📥 Polar webhook received: {event_type} user={user_id} ckid={checkout_id} status={data.get('status')}")
+    payment_id = data.get("id") or data.get("payment_id")
 
-    PAID_EVENTS = {
-        "checkout.updated",
-        "checkout.confirmed", 
-        "order.created",
-        "order.paid",
-        "subscription.created",
-        "subscription.active",
-    }
+    print(f"📥 Dodo webhook received: {event_type} user={user_id} pid={payment_id} status={data.get('status')}")
 
-    paid = False
-    if event_type in PAID_EVENTS:
-        status = (data.get("status") or "").lower()
-        if event_type.startswith("order.") or event_type.startswith("subscription."):
-            paid = True
-        elif status in {"succeeded", "completed", "confirmed", "success"}:
-            paid = True
+    PAID_EVENTS = {"payment.succeeded", "payment.paid", "subscription.active", "subscription.created", "payment.completed"}
+    paid = event_type in PAID_EVENTS or (data.get("status") or "").lower() in {"succeeded", "paid", "completed", "active"}
 
     if paid and user_id and _sb:
         try:
-            _sb.table("profiles").upsert({"id": user_id, "plan": "pro", "paddle_subscription_id": checkout_id}).execute()
-            print(f"✅ Pro granted to user {user_id}")
+            _sb.table("profiles").upsert({"id": user_id, "plan": "pro", "paddle_subscription_id": payment_id}).execute()
+            print(f"✅ Pro granted to user {user_id} via Dodo")
         except Exception as e:
-            print("DB error on webhook:", e)
+            print("DB error on Dodo webhook:", e)
 
     return jsonify({"ok": True})
 
-@app.route("/polar/customer-portal", methods=["POST"])
-def polar_customer_portal():
-    if not POLAR_ACCESS_TOKEN:
-        return jsonify({"error": "Polar not configured"}), 503
-    portal_url = f"https://{'sandbox.' if POLAR_SERVER == 'sandbox' else ''}polar.sh/purchases/subscriptions"
+
+@app.route("/dodo/customer-portal", methods=["POST"])
+def dodo_customer_portal():
+    """Return the Dodo Payments customer portal URL for managing subscriptions."""
+    portal_url = f"{DODO_BASE}/customer-portal"
+    # If your Dodo plan provides a hosted portal, return that URL
+    # Otherwise direct to billing email
     return jsonify({"url": portal_url})
 
 @app.route("/chats", methods=["GET"])

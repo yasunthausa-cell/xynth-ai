@@ -619,10 +619,10 @@
             btn.textContent = 'Opening checkout…';
 
             try {
-                const response = await fetch('/polar/checkout', {
+                const response = await fetch('/dodo/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: session.user.id })
+                    body: JSON.stringify({ user_id: session.user.id, email: session.user.email })
                 });
                 
                 const data = await response.json();

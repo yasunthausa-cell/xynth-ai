@@ -31,7 +31,7 @@ try:
 except Exception:
     pass
 
-PRIMARY_MODEL = "qwen3.5-omni-plus"
+PRIMARY_MODEL = "qwen3.6-plus"
 GROQ_MODEL    = "llama-3.3-70b-versatile"
 FAST_MODEL    = "qwen3-omni-flash"
 
@@ -532,14 +532,21 @@ def _ai_reject(query: str) -> str:
         return "Hello! I'm here to help with deep research and current events for 2026. What would you like to explore?"
 
 
-def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, citation_style="inline", strategy="balanced", debate=False, image_data=None):
+def stream_research(session_id: str, query: str, jwt_token=None, user_id=None, chat_id=None, deep_dive=False, sb=None, session_doc=None, lit_review=False, citation_style="inline", strategy="balanced", debate=False, image_data=None, conversation_history=None):
     """SSE generator for deep research queries."""
     client, primary_model, _ = _get_client()
     if not client:
         yield f"data: {json.dumps({'type': 'error', 'text': 'No AI client. Set DASHSCOPE_API_KEY or GROQ_API_KEY.'})}\n\n"
         return
 
-    history = _conversations.get(session_id, [])
+    # Build history: prefer DB-loaded full history, fall back to in-memory session
+    if conversation_history:
+        # DB history takes precedence and includes the full past conversation
+        history = conversation_history[-40:]  # cap at 40 messages (20 turns)
+        # Merge with any in-memory messages added since last save
+        _conversations[session_id] = history
+    else:
+        history = _conversations.get(session_id, [])
 
     # ── Detect and fetch URLs embedded in the query ───────────────────────────────
     urls_in_query = URL_PATTERN.findall(query)

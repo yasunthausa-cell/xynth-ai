@@ -232,7 +232,8 @@
             display: flex;
             flex-direction: column;
             gap: 2px;
-            max-height: calc(100vh - 260px);
+            flex: 1;
+            min-height: 0;
         }
         .chat-list-label {
             font-size: 11px;
@@ -352,101 +353,7 @@
         .guest-toast-btn.primary:hover { background: var(--accent-hover); }
         .guest-toast-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
 
-        /* Announcement popup */
-        .announcement-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(6px);
-            display: none !important;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .announcement-overlay.show {
-            display: flex !important;
-            opacity: 1;
-        }
-        .announcement-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            width: 90%;
-            max-width: 480px;
-            overflow: hidden;
-            transform: translateY(20px) scale(0.97);
-            transition: transform 0.3s;
-            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
-        }
-        .announcement-overlay.show .announcement-card {
-            transform: translateY(0) scale(1);
-        }
-        .announcement-banner {
-            width: 100%;
-            max-height: 240px;
-            object-fit: cover;
-            display: block;
-        }
-        .announcement-body {
-            padding: 24px;
-        }
-        .announcement-tag {
-            display: inline-block;
-            background: #ffffff;
-            color: #111;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            padding: 3px 10px;
-            border-radius: 20px;
-            margin-bottom: 12px;
-            border: 1px solid #e0e0e0;
-        }
-        .announcement-title {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            line-height: 1.3;
-        }
-        .announcement-text {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            margin-bottom: 20px;
-        }
-        .announcement-footer {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .announcement-close-btn {
-            flex: 1;
-            padding: 11px;
-            border-radius: 10px;
-            border: 1px solid #ddd;
-            background: #ffffff;
-            color: #111;
-            font-weight: 700;
-            font-size: 14px;
-            cursor: pointer;
-            font-family: var(--font);
-            transition: background 0.2s;
-        }
-        .announcement-close-btn:hover { background: #f0f0f0; }
-        .announcement-dismiss {
-            padding: 11px 16px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-secondary);
-            font-size: 13px;
-            cursor: pointer;
-            font-family: var(--font);
-            white-space: nowrap;
-        }
+
 
         /* --- Main Area --- */
         .main {
@@ -1466,6 +1373,7 @@
                     Pro Plan Active
                 </div>
                 <button id="manageSubBtn" class="btn btn-outline" style="width:100%;font-size:12px;padding:8px;">Manage Subscription</button>
+                <button id="cancelSubBtn" class="btn btn-outline" style="width:100%;font-size:12px;padding:8px;color:#ef4444;border-color:#ef4444;margin-top:4px;">Cancel Subscription</button>
             </div>
         </div>
     </div>
@@ -1567,19 +1475,18 @@
         </div>
     </div>
 
-    <!-- Announcement Overlay -->
-    <div id="announcementOverlay" class="announcement-overlay">
-        <div class="announcement-card">
-            <img id="announcementImage" class="announcement-banner" src="" style="display:none;">
-            <div class="announcement-body">
-                <span id="announcementTag" class="announcement-tag">New Feature</span>
-                <h3 id="announcementTitle" class="announcement-title">Welcome to Resynth</h3>
-                <p id="announcementText" class="announcement-text">We've added new research features for you.</p>
-                <div class="announcement-footer">
-                    <button id="announcementCloseBtn" class="announcement-close-btn">Awesome!</button>
-                    <button id="announcementDismissBtn" class="announcement-dismiss">Dismiss</button>
-                </div>
-            </div>
+    <!-- Deep Dive Limit Modal -->
+    <div id="deepDiveLimitModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h2 style="margin-bottom:12px;">🔬 Deep Dive Limit Reached</h2>
+            <p style="color:var(--text-secondary);margin-bottom:8px;">Free users get <strong style="color:var(--text-primary);">2 Deep Dives per month</strong>. You've used yours for this month.</p>
+            <div class="countdown" id="deepDiveCountdown" style="font-size:20px;margin:16px 0;">—</div>
+            <p id="deepDiveLimitDate" style="font-size:12px;color:var(--text-secondary);margin-bottom:20px;"></p>
+            <button class="btn" onclick="window.location.href='/pricing'" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                Upgrade to Pro — Unlimited Deep Dives
+            </button>
+            <button class="btn btn-outline" onclick="document.getElementById('deepDiveLimitModal').classList.add('hidden')">Maybe later</button>
         </div>
     </div>
 
@@ -1624,8 +1531,6 @@
         <div class="chat-list" id="chatList">
             <!-- Historical chats will go here -->
         </div>
-
-        <div class="spacer"></div>
 
         <!-- Research Settings -->
         <div class="settings-section">
@@ -1711,10 +1616,8 @@
             <div id="landingGreeting" class="landing-view" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; touch-action: none;">
                 <h1 class="hero-headline"><span id="greetingText">Good Morning.</span><br><span class="grad">How can I help today?</span></h1>
             </div>
-            
 
-
-            <div id="messagesContainer" class="messages-container"></div>
+            <div id="messagesContainer" class="messages-container" style="padding-top: 60px; margin-top: auto;"></div>
         </div>
 
         <div class="input-area">
@@ -1804,6 +1707,7 @@
         let currentImageData = null;
 
         // Auth Logic
+        window._resynthUserPlan = 'free'; // default, updated on login
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (session) {
                 currentUser = session.user;
@@ -1815,15 +1719,26 @@
                 document.getElementById('settingsBtn').style.display = 'block';
                 document.getElementById('sidebarAuthSection').style.display = 'none';
                 loadChatHistory();
+                // Fetch plan to gate deep dive
+                try {
+                    const r = await fetch('/account', { headers: { 'Authorization': `Bearer ${session.access_token}` } });
+                    const d = await r.json();
+                    window._resynthUserPlan = d.plan || 'free';
+                    if (window._resynthUserPlan === 'pro') {
+                        document.getElementById('membershipBtn').style.display = 'block';
+                    }
+                } catch(e) {}
             } else {
                 currentUser = null;
                 currentToken = "";
+                window._resynthUserPlan = 'free';
                 // NOTE: Do NOT show or hide authModal here — it starts hidden
                 // and is only shown when the user explicitly clicks Log In / Sign Up.
                 document.getElementById('userProfile').style.display = 'none';
                 logoutBtn.style.display = 'none';
                 document.getElementById('accountBtn').style.display = 'none';
                 document.getElementById('settingsBtn').style.display = 'none';
+                document.getElementById('membershipBtn').style.display = 'none';
                 document.getElementById('sidebarAuthSection').style.display = 'flex';
                 document.getElementById('chatList').innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:12px;text-align:center;">Sign in to save chat history</div>';
             }
@@ -1900,7 +1815,10 @@
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const btn = document.getElementById('loginBtn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = 'Logging in... <svg class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>';
+            btn.innerHTML = `<svg class="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`;
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.justifyContent = 'center';
             btn.disabled = true;
             const email = document.getElementById('emailInput').value;
             const password = document.getElementById('passwordInput').value;
@@ -1937,7 +1855,10 @@
             okEl.style.display = 'none';
             const btn = document.getElementById('signupBtn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = 'Creating account... <svg class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>';
+            btn.innerHTML = `<svg class="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`;
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.justifyContent = 'center';
             btn.disabled = true;
             const { error } = await supabaseClient.auth.signUp({ email, password });
             if (error) {
@@ -1946,7 +1867,7 @@
                 btn.disabled = false;
             } else {
                 okEl.style.display = 'block';
-                btn.innerHTML = originalText;
+                btn.innerHTML = '✓ Check your email';
                 btn.disabled = false;
                 // Send welcome email
                 fetch('/auth/welcome', {
@@ -2187,11 +2108,55 @@
         let isDeepDive = false;
         let isLitReview = false;
 
+        // ── Deep Dive monthly limit (2/month for free users) ─────────────────
+        function getDeepDiveUsageThisMonth() {
+            const key = 'resynth_dd_' + new Date().toISOString().slice(0, 7); // YYYY-MM
+            try { return JSON.parse(localStorage.getItem(key) || '0'); } catch(e) { return 0; }
+        }
+        function incrementDeepDiveUsage() {
+            const key = 'resynth_dd_' + new Date().toISOString().slice(0, 7);
+            const cur = getDeepDiveUsageThisMonth();
+            localStorage.setItem(key, JSON.stringify(cur + 1));
+        }
+        function getNextMonthStart() {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        }
+
+        let deepDiveLimitTimer = null;
+        function showDeepDiveLimitModal() {
+            const modal = document.getElementById('deepDiveLimitModal');
+            modal.classList.remove('hidden');
+            const nextMonth = getNextMonthStart();
+            const opts = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('deepDiveLimitDate').textContent = 'Resets on: ' + nextMonth.toLocaleDateString(undefined, opts);
+            if (deepDiveLimitTimer) clearInterval(deepDiveLimitTimer);
+            function updateDDTimer() {
+                const diff = getNextMonthStart() - new Date();
+                if (diff <= 0) { document.getElementById('deepDiveCountdown').textContent = 'Ready!'; clearInterval(deepDiveLimitTimer); return; }
+                const d = Math.floor(diff / 86400000);
+                const h = Math.floor((diff % 86400000) / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                document.getElementById('deepDiveCountdown').textContent = `${d}d ${h.toString().padStart(2,'0')}h ${m.toString().padStart(2,'0')}m`;
+            }
+            updateDDTimer();
+            deepDiveLimitTimer = setInterval(updateDDTimer, 30000);
+        }
+
         const deepDiveBtn = document.getElementById('deepDiveBtn');
         const litReviewBtn = document.getElementById('litReviewBtn');
 
         if (deepDiveBtn) {
             deepDiveBtn.addEventListener('click', function() {
+                // Check plan — pro users always allowed
+                const userIsPro = (window._resynthUserPlan === 'pro');
+                if (!isDeepDive && !userIsPro) {
+                    const used = getDeepDiveUsageThisMonth();
+                    if (used >= 2) {
+                        showDeepDiveLimitModal();
+                        return;
+                    }
+                }
                 isDeepDive = !isDeepDive;
                 this.classList.toggle('active', isDeepDive);
                 document.getElementById('deepDiveText').textContent = isDeepDive ? 'Deep Diving...' : 'Deep Dive';
@@ -2466,7 +2431,10 @@
                 });
                 const messages = await res.json();
                 messagesContainer.innerHTML = '';
+                chatView.classList.add('has-messages');
                 messages.forEach(msg => appendMessage(msg.role, msg.content));
+                // Scroll to bottom after loading
+                setTimeout(() => chatView.scrollTop = chatView.scrollHeight, 100);
             } catch(e) {
                 messagesContainer.innerHTML = '<div style="text-align:center; color:#ef4444; margin-top:40px;">Failed to load messages</div>';
             }
@@ -2715,6 +2683,10 @@
         }
 
         async function send() {
+            // Count deep dive usage when enabled (for free users)
+            if (isDeepDive && window._resynthUserPlan !== 'pro') {
+                incrementDeepDiveUsage();
+            }
             const text = messageInput.value.trim();
             if (!text) return;
 
@@ -3122,53 +3094,25 @@
             });
         }
 
-        // ── Announcement Popup System ──────────────────────────────────────
-        (async function loadAnnouncement() {
-            try {
-                const res = await fetch('/api/announcement');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (!data || !data.active) return;
-
-                // Check if already dismissed this session
-                const dismissedKey = 'xynth_dismissed_announcement_' + (data.id || data.created_at || '');
-                if (sessionStorage.getItem(dismissedKey)) return;
-
-                const overlay = document.getElementById('announcementOverlay');
-                if (!overlay) return; // Prevent crash if element is missing
-                
-                const tag = document.getElementById('announcementTag');
-                const title = document.getElementById('announcementTitle');
-                const text = document.getElementById('announcementText');
-                const img = document.getElementById('announcementImage');
-
-                if (data.tag && tag) tag.textContent = data.tag;
-                if (data.title && title) title.textContent = data.title;
-                if (data.message && text) text.textContent = data.message;
-                if (data.image_url && img) {
-                    img.src = data.image_url;
-                    img.style.display = 'block';
-                }
-
-                // Delay slightly for page load feel
-                setTimeout(() => overlay.classList.add('show'), 600);
-
-                function dismiss() {
-                    overlay.classList.remove('show');
-                    sessionStorage.setItem(dismissedKey, '1');
-                }
-
-                const closeBtn = document.getElementById('announcementCloseBtn');
-                const dismissBtn = document.getElementById('announcementDismissBtn');
-                if (closeBtn) closeBtn.addEventListener('click', dismiss);
-                if (dismissBtn) dismissBtn.addEventListener('click', dismiss);
-                overlay.addEventListener('click', (e) => {
-                    if (e.target === overlay) dismiss();
-                });
-            } catch(e) {
-                console.warn('Announcement error:', e);
-            }
-        })();
+        // ── Dodo Payments / Subscription management ───────────────────────
+        const manageSubBtn = document.getElementById('manageSubBtn');
+        if (manageSubBtn) {
+            manageSubBtn.addEventListener('click', async () => {
+                manageSubBtn.disabled = true;
+                manageSubBtn.innerHTML = `<svg class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`;
+                try {
+                    const res = await fetch('/dodo/customer-portal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+                        body: JSON.stringify({ user_id: currentUser?.id })
+                    });
+                    const d = await res.json();
+                    if (d.url) window.open(d.url, '_blank');
+                    else alert('Could not open portal. Please try again.');
+                } catch(e) { alert('Error: ' + e.message); }
+                finally { manageSubBtn.disabled = false; manageSubBtn.innerHTML = 'Manage Subscription'; }
+            });
+        }
     </script>
 </body>
 </html>
